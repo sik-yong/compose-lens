@@ -16,13 +16,17 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:node": "node test/node-smoke.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
   },
   "devDependencies": {
+    "@types/node": "^24.19.2",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "yaml": "^2.9.1"
+  }
 }
