@@ -3,6 +3,7 @@ import {
   isMap,
   isNode,
   isPair,
+  isScalar,
   isSeq,
   parseDocument,
   type Document,
@@ -64,12 +65,26 @@ const SYNTAX_MESSAGES: Partial<Record<ErrorCode, string>> = {
 
 const syntaxMessage = (code: ErrorCode) => SYNTAX_MESSAGES[code] ?? `Invalid YAML (${code}).`;
 
-/** Rejects YAML ASTs nested deeper than LIMITS.maxDepth, counting keys as well as values. */
-function checkAstDepth(node: unknown, depth: number): boolean {
-  if (depth > LIMITS.maxDepth) return false;
-  if (isPair(node)) return checkAstDepth(node.key, depth) && checkAstDepth(node.value, depth);
-  if (isMap(node) || isSeq(node)) return node.items.every((item) => checkAstDepth(item, depth + 1));
-  return true; // scalars and aliases (aliases are bounded by maxAliasCount and checkShape)
+/**
+ * Checks the YAML AST before conversion: nesting deeper than LIMITS.maxDepth,
+ * and non-scalar mapping keys. Compose keys are always strings, and complex or
+ * aliased keys would otherwise hide depth and cycles once toJS() stringifies them.
+ */
+function checkAst(node: unknown, depth: number): Diagnostic | undefined {
+  if (depth > LIMITS.maxDepth) return limitError(`Nesting is deeper than ${LIMITS.maxDepth} levels.`);
+  if (isPair(node)) {
+    if (node.key !== null && !isScalar(node.key)) {
+      return { code: "schema", severity: "error", message: "Mapping keys must be plain strings.", location: { path: [] } };
+    }
+    return checkAst(node.value, depth);
+  }
+  if (isMap(node) || isSeq(node)) {
+    for (const item of node.items) {
+      const found = checkAst(item, depth + 1);
+      if (found) return found;
+    }
+  }
+  return undefined; // scalars and value aliases (bounded by maxAliasCount and checkShape)
 }
 
 /** Rejects cycles (from recursive aliases) and nesting deeper than LIMITS.maxDepth. */
@@ -140,9 +155,8 @@ export function parseYaml(text: string): ParsedYaml {
     return { diagnostics, locate };
   }
 
-  if (!checkAstDepth(doc.contents, 0)) {
-    return { diagnostics: [limitError(`Nesting is deeper than ${LIMITS.maxDepth} levels.`)], locate };
-  }
+  const astError = checkAst(doc.contents, 0);
+  if (astError) return { diagnostics: [astError], locate };
 
   let value: unknown;
   try {

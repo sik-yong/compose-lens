@@ -33,9 +33,9 @@ describe("limits", () => {
     expect(codes(analyze(input))).toEqual(["limit"]);
   });
 
-  it("counts nesting inside keys", () => {
+  it("rejects deeply nested keys (complex keys are not allowed at all)", () => {
     const key = `${"[".repeat(70)}k${"]".repeat(70)}`;
-    expect(codes(analyze(`services: {app: {image: x}}\nx-deep: {? ${key} : 1}\n`))).toEqual(["limit"]);
+    expect(codes(analyze(`services: {app: {image: x}}\nx-deep: {? ${key} : 1}\n`))).toEqual(["schema"]);
   });
 
   it("still accepts nesting at the limit", () => {
@@ -76,10 +76,22 @@ describe("invalid depends_on and network settings are reported, not normalized",
   const deps = (spec: string) =>
     analyze(`services:\n  db: {image: x}\n  a:\n    image: x\n    depends_on:\n      db: ${spec}\n`);
 
-  it.each(["123", '{required: "false"}', "{condition: never}", '{restart: "yes"}'])("rejects db: %s", (spec) => {
+  it.each([
+    "123",
+    "{condition: never}",
+    "{condition: null}",
+    "{required: null}",
+    '{restart: "yes"}',
+  ])("rejects db: %s", (spec) => {
     const r = deps(spec);
     expect(codes(r)).toEqual(["schema"]);
     expect(r.graph!.edges.filter((e) => e.kind === "depends_on")).toEqual([]);
+  });
+
+  it('accepts the strings "true" and "false" for required and restart', () => {
+    expect(deps('{required: "false", restart: "true"}').model!.services[1]!.dependsOn).toEqual([
+      { service: "db", condition: "service_started", required: false, restart: true },
+    ]);
   });
 
   it("accepts an empty entry as service_started", () => {
@@ -90,5 +102,20 @@ describe("invalid depends_on and network settings are reported, not normalized",
 
   it("rejects network_mode with an empty networks list", () => {
     expect(codes(analyze("services:\n  a: {image: x, network_mode: host, networks: []}\n"))).toEqual(["schema"]);
+  });
+});
+
+describe("Codex re-review of 0bac079", () => {
+  it("rejects complex keys that hide depth or cycles behind aliases", () => {
+    expect(codes(analyze("x-keys: &a\n  ? [*a]\n  : 1\nservices:\n  app: {image: x}\n"))).toEqual(["schema"]);
+    const deep = `${"[".repeat(40)}1${"]".repeat(40)}`;
+    const input = `x-a: &a ${deep}\nx-b: {? ${"[".repeat(40)}*a${"]".repeat(40)} : 1}\nservices:\n  app: {image: x}\n`;
+    expect(codes(analyze(input))).not.toEqual([]);
+  });
+
+  it.each(["missing:", ":/data", "a:b:ro:extra", ""])("rejects the volume %j", (spec) => {
+    const r = analyze(`services:\n  a:\n    image: x\n    volumes: ["${spec}"]\n`);
+    expect(codes(r)).toEqual(["schema"]);
+    expect(r.model!.services[0]!.volumes).toEqual([]);
   });
 });

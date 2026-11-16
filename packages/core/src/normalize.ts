@@ -139,23 +139,22 @@ function classifySource(source: string): Mount["kind"] {
 function splitMountSpec(raw: string): string[] {
   const parts: string[] = [];
   let rest = raw;
-  while (rest.length > 0) {
+  for (;;) {
     const skip = WINDOWS_PATH.test(rest) ? 2 : 0;
     const colon = rest.indexOf(":", skip);
-    if (colon < 0) {
-      parts.push(rest);
-      break;
-    }
+    if (colon < 0) break;
     parts.push(rest.slice(0, colon));
     rest = rest.slice(colon + 1);
   }
+  parts.push(rest); // keep a trailing empty part ("name:") so it can be rejected
   return parts;
 }
 
-function parseShortMount(raw: string): Mount {
+function parseShortMount(raw: string): Mount | undefined {
   const parts = splitMountSpec(raw);
-  if (parts.length === 1) return { kind: "anonymous", target: raw, readOnly: false };
+  if (parts.length === 1) return raw === "" ? undefined : { kind: "anonymous", target: raw, readOnly: false };
   const [source = "", target = "", mode = ""] = parts;
+  if (parts.length > 3 || source === "" || target === "") return undefined;
   return { kind: classifySource(source), source, target, readOnly: mode.split(",").includes("ro") };
 }
 
@@ -188,7 +187,7 @@ function normalizeVolumes(ctx: Context, value: unknown, path: DocumentPath): Mou
     const mount =
       typeof entry === "string" ? parseShortMount(entry) : isObj(entry) ? parseLongMount(entry) : undefined;
     if (mount) result.push(mount);
-    else ctx.schema([...path, i], "Unrecognized volume format.");
+    else ctx.schema([...path, i], "Invalid volume mount.");
   });
   return result;
 }
@@ -200,6 +199,14 @@ const CONDITIONS: readonly DependencyCondition[] = [
   "service_healthy",
   "service_completed_successfully",
 ];
+
+/** Compose accepts booleans and the strings "true"/"false". */
+function toBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return undefined;
+}
 
 function normalizeDependsOn(ctx: Context, value: unknown, path: DocumentPath): Dependency[] {
   if (value === undefined) return [];
@@ -221,31 +228,25 @@ function normalizeDependsOn(ctx: Context, value: unknown, path: DocumentPath): D
         return [];
       }
       const opts = options ?? {};
-      const condition = opts["condition"] ?? "service_started";
-      const required = opts["required"] ?? true;
-      const restart = opts["restart"] ?? false;
+      // An omitted key takes the default; an explicit null is invalid.
+      const condition = "condition" in opts ? opts["condition"] : "service_started";
+      const required = toBoolean("required" in opts ? opts["required"] : true);
+      const restart = toBoolean("restart" in opts ? opts["restart"] : false);
       let valid = true;
       if (!CONDITIONS.includes(condition as DependencyCondition)) {
         ctx.schema([...at, "condition"], "Unknown `depends_on` condition.");
         valid = false;
       }
-      if (typeof required !== "boolean") {
+      if (required === undefined) {
         ctx.schema([...at, "required"], "`required` must be true or false.");
         valid = false;
       }
-      if (typeof restart !== "boolean") {
+      if (restart === undefined) {
         ctx.schema([...at, "restart"], "`restart` must be true or false.");
         valid = false;
       }
-      if (!valid) return [];
-      return [
-        {
-          service,
-          condition: condition as DependencyCondition,
-          required: required as boolean,
-          restart: restart as boolean,
-        },
-      ];
+      if (!valid || required === undefined || restart === undefined) return [];
+      return [{ service, condition: condition as DependencyCondition, required, restart }];
     });
   }
   ctx.schema(path, "`depends_on` must be a list or a mapping.");
