@@ -11,23 +11,25 @@ export type DiagnosticCode =
 
 export type Severity = "error" | "warning" | "info";
 
-/** Where a diagnostic points: a text position, a document path, or both. */
-export interface DiagnosticLocation {
-  /** 1-based line in the input text. */
-  line?: number;
-  /** 1-based column in the input text. */
-  column?: number;
-  /** Path in the Compose document, e.g. ["services", "web", "ports", 0]. */
-  path?: readonly (string | number)[];
-}
+/** A path in the Compose document, e.g. ["services", "web", "ports", 0]. `[]` is the document root. */
+export type DocumentPath = readonly (string | number)[];
 
 /**
- * A diagnostic message. Messages must never quote masked values
- * (environment / build.args); point to the location or key instead (PRD §8.4).
+ * Where a diagnostic points (PRD §7). Every diagnostic has a location:
+ * a document path, a text position, or both. Errors about the whole
+ * document use the root path `[]`.
+ */
+export type DiagnosticLocation =
+  | { path: DocumentPath; line?: number; column?: number }
+  | { path?: DocumentPath; line: number; column: number };
+
+/**
+ * A diagnostic message. Messages never quote values from the input;
+ * they refer to the location and key instead (PRD §8.4).
  */
 export interface Diagnostic {
   code: DiagnosticCode;
   severity: Severity;
   message: string;
-  location?: DiagnosticLocation;
+  location: DiagnosticLocation;
 }

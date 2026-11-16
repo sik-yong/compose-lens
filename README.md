@@ -51,7 +51,7 @@ docs/            PRD, support matrix, verification notes
 
 ## Development
 
-Requires Node.js 22 or later.
+Requires Node.js 22.12+, 24, or 26+.
 
 ```sh
 npm install

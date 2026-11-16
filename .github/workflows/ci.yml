@@ -19,7 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        # 22.12.0 is the minimum declared in package.json engines.
+        node: ['22.12.0', 24, 26]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -30,3 +31,4 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run test:node -w @compose-lens/core
