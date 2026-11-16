@@ -23,8 +23,8 @@ This document is the source of truth for what Compose Lens understands. If the a
 | Element | Level | Notes |
 |---|---|---|
 | `services` | Analyzed | Must be a mapping, otherwise a `schema` error |
-| `networks` | Analyzed | `external`, `name`, `driver`, `internal` shown. External networks are marked "existence not verified". `driver_opts`, `ipam`, `attachable`, `enable_ipv6`, `labels`: Noted |
-| `volumes` | Analyzed | `external`, `name`, `driver` shown. External volumes are marked "existence not verified". `driver_opts`, `labels`: Noted |
+| `networks` | Analyzed | `external` analyzed (marked "existence not verified"). `name`, `driver`, `internal`, `driver_opts`, `ipam`, `attachable`, `enable_ipv6`, `labels`: not displayed in v0.1.0 |
+| `volumes` | Analyzed | `external` analyzed (marked "existence not verified"). `name`, `driver`, `driver_opts`, `labels`: not displayed in v0.1.0 |
 | `name` | Shown | Project name |
 | `version` | Noted | Obsolete in the spec. Info diagnostic only |
 | `secrets`, `configs` | Accepted | Not displayed. Services' references to them are shown by name. Contents and files are never read |
@@ -38,9 +38,9 @@ This document is the source of truth for what Compose Lens understands. If the a
 |---|---|---|
 | `image` | Shown | No secret detection guaranteed. See [Masking boundary](#masking-boundary) |
 | `build` | Analyzed (partial) | String or object. `context`, `dockerfile`, `target` shown. `args`: **Masked**. Other `build` keys: Noted |
-| `ports` | Analyzed | Short and long syntax, ranges, host IP, protocol. Long syntax: `target`, `published`, `host_ip`, `protocol` analyzed. `name` and `app_protocol` shown. `mode` Noted. See [Ports](#ports) |
+| `ports` | Analyzed | Short and long syntax, ranges, host IP, protocol. Long syntax: `target`, `published`, `host_ip`, `protocol` analyzed. `name`, `app_protocol`, `mode`: not displayed in v0.1.0. See [Ports](#ports) |
 | `expose` | Shown | |
-| `networks` | Analyzed | List and mapping syntax. `aliases`, `ipv4_address`, `ipv6_address` shown |
+| `networks` | Analyzed | List and mapping syntax. `aliases`, `ipv4_address`, `ipv6_address`: not displayed in v0.1.0 |
 | `network_mode` | Analyzed | `none`, `host`, `service:<name>`, `container:<id>`. See [Networks](#networks) |
 | `volumes` | Analyzed | Short and long syntax. See [Volumes](#volumes) |
 | `tmpfs` | Shown | |
@@ -88,8 +88,10 @@ This document is the source of truth for what Compose Lens understands. If the a
 | dynamic | `"80"` | The host port is **assigned at random**. It is not host port 80 |
 | pool | `"8000-8010:80"`, or `published: "8000-8010"` with a single `target` | **One** free port from the range is assigned. The whole range is not occupied |
 
-- **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP, `0.0.0.0`, or `::` counts as all interfaces and overlaps any IP. Other IPs overlap only when they are equal.
-- Excluded from conflict checks: dynamic and pool bindings, and ports containing a variable on either side (reported as `unresolved`). A note for a pool overlapping a fixed binding is *(v0.1.1+)*.
+- **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP counts as all interfaces of both families. `0.0.0.0` covers all IPv4 addresses and `::` all IPv6 addresses, never the other family. Other addresses overlap only when equal after normalization (`::1` equals `0:0:0:0:0:0:0:1`). Unparseable values compare as written.
+- Host port `0` is dynamically assigned, like an omitted host port.
+- Excluded from conflict checks: dynamic and pool bindings, and ports with a variable anywhere (IP, either port, or protocol), which are reported as `unresolved`.
+- Each conflicting binding gets one warning that names one counterpart. A note for a pool overlapping a fixed binding is *(v0.1.1+)*.
 - Conflicts are reported as "may conflict within this file". Actual host usage is not checked. Profiles are not evaluated.
 
 ### Volumes
@@ -105,6 +107,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 ### Variable interpolation
 
 - **Not resolved in v0.1.** `.env` and environment variables are not read.
+- A variable starts with `${` or with `$` followed by a letter or `_`. Any other `$` (such as `$5`) is literal, as in Compose.
 - Detected forms: `${VAR}`, `${VAR:-d}`, `${VAR-d}`, `${VAR:?e}`, `${VAR?e}`, `${VAR:+a}`, `${VAR+a}`, `$VAR`, and nested expressions such as `${A:-${B}}`. `$$` is a literal `$`, so `$$VAR` is not a variable.
 - Values keep their original expression and are marked *unresolved*, even when a default exists.
 - Separators inside an expression are not treated as separators: `${PORT:-8080}:80` is one host part and one container part.
@@ -122,6 +125,8 @@ This document is the source of truth for what Compose Lens understands. If the a
 | Nesting depth | 64 |
 | Services | 300 |
 | Graph nodes + edges | 3000 |
+| Port mappings (all services) | 5000 |
+| Diagnostics listed | 500 (the rest are counted in one info) |
 
 - Exceeding any limit produces a `limit` error and no graph.
 
@@ -138,4 +143,5 @@ These are known gaps, not silent behavior. They are planned for v0.1.1 or later.
 
 - **Sub-keys:** Sub-keys not listed in this file are not analyzed and not reported. Top-level and service-level unsupported fields *are* reported.
 - **Port pools:** No note when a pool range overlaps a fixed binding. Pools are still excluded from conflict checks.
+- **Nested attributes not displayed:** network aliases and static IPs, top-level network/volume `name`, `driver`, and options, and port `name`/`app_protocol`/`mode` are parsed past but not shown.
 - **URL credentials:** Credentials inside displayed values such as `image` or `build.context` are shown as written.

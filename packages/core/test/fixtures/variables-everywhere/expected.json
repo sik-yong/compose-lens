@@ -1,0 +1,134 @@
+{
+  "diagnostics": [
+    "warning unresolved services.a.depends_on@15",
+    "warning unresolved services.a.ports.1@6",
+    "warning unresolved services.a.ports.2@7",
+    "warning unresolved services.a.ports.3@8",
+    "warning unresolved services.a.ports.4@9"
+  ],
+  "nodes": [
+    "service a",
+    "network default implicit"
+  ],
+  "edges": [
+    "a -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "a",
+        "ports": [
+          {
+            "raw": "8080:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8080,
+                "end": 8080
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          },
+          {
+            "raw": "${BIND_IP}:8080:80",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "${BIND_IP}",
+            "index": 1
+          },
+          {
+            "raw": "8080:80/${PROTO}",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "${PROTO}",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 2
+          },
+          {
+            "raw": "${PORT}",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "index": 3
+          },
+          {
+            "raw": "${IP}:8080:80/tcp",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "${IP}",
+            "index": 4
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [
+          {
+            "kind": "bind",
+            "source": "./cash$5",
+            "target": "/data",
+            "readOnly": false,
+            "index": 0
+          },
+          {
+            "kind": "bind",
+            "source": "./price$$",
+            "target": "/p",
+            "readOnly": false,
+            "index": 1
+          }
+        ],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "${TARGET}",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

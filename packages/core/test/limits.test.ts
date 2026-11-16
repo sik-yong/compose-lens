@@ -9,6 +9,8 @@ describe("LIMITS", () => {
       maxDepth: 64,
       maxServices: 300,
       maxGraphElements: 3000,
+      maxPorts: 5000,
+      maxDiagnostics: 500,
     });
   });
 });

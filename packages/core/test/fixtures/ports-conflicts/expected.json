@@ -1,10 +1,12 @@
 {
   "diagnostics": [
+    "warning conflict services.a.ports.0@5",
+    "warning conflict services.a.ports.2@7",
     "warning conflict services.b.ports.0@13",
-    "warning conflict services.c.ports.0@20",
+    "warning conflict services.b.ports.2@15",
     "warning conflict services.c.ports.0@20",
     "warning conflict services.c.ports.1@21",
-    "warning conflict services.c.ports.1@21",
+    "warning conflict services.d.ports.0@25",
     "warning conflict services.d.ports.1@26"
   ],
   "nodes": [

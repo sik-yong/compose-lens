@@ -133,3 +133,31 @@ describe("Codex re-review of b63f2c0", () => {
     expect(r.model!.services[1]!.dependsOn[0]).toMatchObject({ required: false, restart: true });
   });
 });
+
+describe("Codex review of M2 (86c29eb)", () => {
+  it("caps diagnostics so port conflicts can't explode", () => {
+    const ports = Array.from({ length: 300 }, (_, i) => `"8080:${i + 1}"`).join(", ");
+    const r = analyze(`services:\n  a: {image: x, ports: [${ports}]}\n`);
+    expect(r.diagnostics.length).toBeLessThanOrEqual(301);
+    expect(r.diagnostics.filter((d) => d.code === "conflict")).toHaveLength(300);
+  });
+
+  it("summarizes diagnostics beyond the cap", () => {
+    const ports = Array.from({ length: 600 }, (_, i) => `"8080:${i + 1}"`).join(", ");
+    const r = analyze(`services:\n  a: {image: x, ports: [${ports}]}\n`);
+    expect(r.diagnostics).toHaveLength(501);
+    expect(r.diagnostics.at(-1)).toMatchObject({ code: "limit", severity: "info" });
+  });
+
+  it("rejects more port mappings than the limit", () => {
+    const ports = Array.from({ length: 5001 }, () => '"80"').join(",");
+    expect(analyze(`services:\n  a: {image: x, ports: [${ports}]}\n`).diagnostics.map((d) => d.code)).toEqual(["limit"]);
+  });
+
+  it("stays fast with many same-port bindings on distinct IPs", () => {
+    const ports = Array.from({ length: 4000 }, (_, i) => `"10.0.${i >> 8}.${i & 255}:8080:80"`).join(",");
+    const started = performance.now();
+    analyze(`services:\n  a: {image: x, ports: [${ports}]}\n`);
+    expect(performance.now() - started).toBeLessThan(3000);
+  });
+});

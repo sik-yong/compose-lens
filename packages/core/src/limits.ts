@@ -13,4 +13,8 @@ export const LIMITS = {
   maxServices: 300,
   /** Maximum graph nodes + edges. */
   maxGraphElements: 3000,
+  /** Maximum port entries across all services. */
+  maxPorts: 5000,
+  /** Maximum diagnostics returned; the rest are summarized in one info. */
+  maxDiagnostics: 500,
 } as const;

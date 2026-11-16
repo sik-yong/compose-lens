@@ -1,4 +1,4 @@
-import type { ComposeModel, GraphNode, Mount, NetworkMode, PortMapping, Service } from "@compose-lens/core";
+import { hasVariable, type ComposeModel, type GraphNode, type Mount, type NetworkMode, type PortMapping, type Service } from "@compose-lens/core";
 import type { ReactNode } from "react";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -50,7 +50,6 @@ function mount(m: Mount) {
   );
 }
 
-const hasVariable = (s: string) => s.replaceAll("$$", "").includes("$");
 const Unresolved = () => <span className="text-amber-700"> (contains a variable, not resolved)</span>;
 
 function networkMode(mode: NetworkMode) {

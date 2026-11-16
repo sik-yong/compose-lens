@@ -47,6 +47,7 @@ function hostBinding(host: string | undefined, container: PortRange | undefined)
   if (hasVariable(host)) return { kind: "unresolved" };
   const ports = parseRange(host);
   if (!ports) return undefined;
+  if (ports.start === 0 && ports.end === 0) return { kind: "dynamic" }; // Docker assigns a free port
   if (!container) return { kind: "unresolved" }; // container side has a variable
   if (rangeSize(container) === 1) return rangeSize(ports) > 1 ? { kind: "pool", ports } : { kind: "fixed", ports };
   return rangeSize(ports) === rangeSize(container) ? { kind: "fixed", ports } : undefined;
@@ -63,7 +64,9 @@ function makePort(
   const containerHasVariable = hasVariable(containerText);
   const container = containerHasVariable ? undefined : parseRange(containerText);
   if (!container && !containerHasVariable) return undefined;
-  const host = hostBinding(hostText, container);
+  // A variable anywhere (IP, protocol, either port) can change the whole binding.
+  const anyVariable = [raw, hostIp ?? "", protocol].some(hasVariable);
+  const host = anyVariable ? ({ kind: "unresolved" } as const) : hostBinding(hostText, container);
   if (!host) return undefined;
   const mapping: Omit<PortMapping, "index"> = { raw, host, protocol };
   if (container) mapping.container = container;
@@ -459,7 +462,7 @@ function normalizeResources(ctx: Context, value: unknown, field: "networks" | "v
 export function normalize(
   value: unknown,
   locate: Locate,
-): { model?: ComposeModel; diagnostics: Diagnostic[] } {
+): { model?: ComposeModel; diagnostics: Diagnostic[]; suppressed?: number } {
   const ctx = new Context(locate);
   if (!isObj(value)) {
     ctx.schema([], "A Compose file must be a mapping with a `services` key.");
@@ -482,8 +485,17 @@ export function normalize(
   }
 
   reportTopLevelKeys(ctx, value);
+  const normalizedServices = serviceNames.map((name) => normalizeService(ctx, name, services[name]));
+  const portCount = normalizedServices.reduce((n, s) => n + s.ports.length, 0);
+  if (portCount > LIMITS.maxPorts) {
+    return {
+      diagnostics: [
+        { code: "limit", severity: "error", message: `More than ${LIMITS.maxPorts} port mappings.`, location: { path: ["services"] } },
+      ],
+    };
+  }
   const model: ComposeModel = {
-    services: serviceNames.map((name) => normalizeService(ctx, name, services[name])),
+    services: normalizedServices,
     networks: normalizeResources(ctx, value["networks"], "networks"),
     volumes: normalizeResources(ctx, value["volumes"], "volumes"),
   };
@@ -497,5 +509,5 @@ export function normalize(
   }
 
   checkModel(ctx, model);
-  return { model, diagnostics: ctx.diagnostics };
+  return { model, diagnostics: ctx.diagnostics, suppressed: ctx.suppressed };
 }

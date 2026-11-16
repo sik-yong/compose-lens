@@ -1,6 +1,7 @@
 import type { DocumentPath } from "./diagnostics.js";
 import type { ComposeModel, PortMapping, Service } from "./model.js";
 import { hasVariable, type Context } from "./context.js";
+import { hostIp, hostIpsOverlap, type HostIp } from "./ip.js";
 
 const servicePath = (s: Service, ...rest: (string | number)[]): DocumentPath => ["services", s.name, ...rest];
 
@@ -11,7 +12,9 @@ function checkReferences(ctx: Context, model: ComposeModel) {
 
   for (const s of model.services) {
     for (const dep of s.dependsOn) {
-      if (!services.has(dep.service)) {
+      if (hasVariable(dep.service)) {
+        ctx.report("unresolved", "warning", servicePath(s, "depends_on"), `A dependency of \`${s.name}\` contains a variable. Its reference is not checked.`);
+      } else if (!services.has(dep.service)) {
         ctx.report("reference", "error", servicePath(s, "depends_on"), `\`${s.name}\` depends on an undefined service \`${dep.service}\`.`);
       }
     }
@@ -53,36 +56,59 @@ function checkNetworkModes(ctx: Context, model: ComposeModel) {
   }
 }
 
-/** Interfaces that cover every address of their family (or all, when unset). */
-const isWildcard = (ip: string | undefined) => ip === undefined || ip === "0.0.0.0" || ip === "::";
-const ipsOverlap = (a: string | undefined, b: string | undefined) => isWildcard(a) || isWildcard(b) || a === b;
+type Binding = { service: Service; port: PortMapping; protocol: string; start: number; end: number; ip: HostIp };
 
+/**
+ * Reports every fixed binding that overlaps another one, once per binding and
+ * in file order, naming one counterpart. A sweep over sorted ranges keeps this
+ * near-linear (bounded by LIMITS.maxPorts in the worst case of many IPs).
+ */
 function checkPortConflicts(ctx: Context, model: ComposeModel) {
-  const fixed: { service: Service; port: PortMapping; start: number; end: number }[] = [];
+  const fixed: Binding[] = [];
   for (const s of model.services) {
     for (const p of s.ports) {
-      if (p.host.kind === "fixed") fixed.push({ service: s, port: p, start: p.host.ports.start, end: p.host.ports.end });
-      if (p.host.kind === "unresolved") {
+      if (p.host.kind === "fixed") {
+        fixed.push({
+          service: s,
+          port: p,
+          protocol: p.protocol.toLowerCase(),
+          start: p.host.ports.start,
+          end: p.host.ports.end,
+          ip: hostIp(p.hostIp),
+        });
+      } else if (p.host.kind === "unresolved") {
         ctx.report("unresolved", "warning", servicePath(s, "ports", p.index), "The port contains a variable. It is not checked for conflicts.");
       }
     }
   }
-  for (let i = 0; i < fixed.length; i++) {
-    for (let j = 0; j < i; j++) {
-      const a = fixed[j]!;
-      const b = fixed[i]!;
-      if (a.port.protocol.toLowerCase() !== b.port.protocol.toLowerCase()) continue;
-      if (a.end < b.start || b.end < a.start) continue;
-      if (!ipsOverlap(a.port.hostIp, b.port.hostIp)) continue;
-      const port = Math.max(a.start, b.start);
-      const who = a.service === b.service ? `\`${a.service.name}\` publishes` : `\`${a.service.name}\` and \`${b.service.name}\` publish`;
-      ctx.report(
-        "conflict",
-        "warning",
-        servicePath(b.service, "ports", b.port.index),
-        `${who} host port ${port}/${b.port.protocol} more than once. They may conflict if run together (the host itself is not checked).`,
-      );
+  const order = fixed.map((_, i) => i).sort((x, y) => fixed[x]!.start - fixed[y]!.start || x - y);
+  const active = new Map<string, number[]>();
+  const counterpart = new Map<number, number>();
+  for (const i of order) {
+    const cur = fixed[i]!;
+    const list = (active.get(cur.protocol) ?? []).filter((j) => fixed[j]!.end >= cur.start);
+    for (const k of list) {
+      if (!hostIpsOverlap(fixed[k]!.ip, cur.ip)) continue;
+      if (!counterpart.has(i)) counterpart.set(i, k);
+      if (!counterpart.has(k)) counterpart.set(k, i);
     }
+    list.push(i);
+    active.set(cur.protocol, list);
+  }
+  for (const [i, j] of [...counterpart].sort((x, y) => x[0] - y[0])) {
+    const b = fixed[i]!;
+    const other = fixed[j]!;
+    const port = Math.max(b.start, other.start);
+    const who =
+      b.service === other.service
+        ? `\`${b.service.name}\` publishes`
+        : `\`${b.service.name}\` and \`${other.service.name}\` publish`;
+    ctx.report(
+      "conflict",
+      "warning",
+      servicePath(b.service, "ports", b.port.index),
+      `${who} host port ${port}/${b.port.protocol} more than once. They may conflict if run together (the host itself is not checked).`,
+    );
   }
 }
 

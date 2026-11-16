@@ -1,0 +1,15 @@
+services:
+  a:
+    image: x
+    ports:
+      - "8080:80"
+      - "${BIND_IP}:8080:80"      # IP is a variable: deferred
+      - "8080:80/${PROTO}"        # protocol is a variable: deferred
+      - "${PORT}"                 # could be anything: deferred, not dynamic
+      - target: 80
+        published: "8080"
+        host_ip: "${IP}"          # deferred
+    volumes:
+      - "./cash$5:/data"          # $5 is not a variable: a bind mount
+      - "./price$$:/p"            # $$ is a literal $
+    depends_on: ["${TARGET}"]     # deferred, not an undefined service

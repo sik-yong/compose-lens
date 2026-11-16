@@ -1,4 +1,5 @@
 export { analyze, type AnalysisResult } from "./analyze.js";
+export { hasVariable } from "./context.js";
 export { LIMITS } from "./limits.js";
 export type {
   Diagnostic,

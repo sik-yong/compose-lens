@@ -1,0 +1,8 @@
+# Same host port 8000/tcp everywhere; only the host IP differs.
+services:
+  v4-any: {image: x, ports: ["0.0.0.0:8000:80"]}
+  v6-loopback: {image: x, ports: ["[::1]:8000:80"]}          # no conflict: other family than 0.0.0.0
+  v6-loopback-long: {image: x, ports: ["[0:0:0:0:0:0:0:1]:8000:80"]} # conflict: same address as ::1
+  v4-loopback: {image: x, ports: ["127.0.0.1:8000:80"]}      # conflict: 0.0.0.0 covers it
+  v6-any: {image: x, ports: ["[::]:8000:80"]}                # conflict: :: covers ::1
+  zero: {image: x, ports: ["0:80", "0:80"]}                  # host port 0 is dynamic: no conflict

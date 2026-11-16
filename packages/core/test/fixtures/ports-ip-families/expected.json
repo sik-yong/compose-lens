@@ -1,0 +1,279 @@
+{
+  "diagnostics": [
+    "warning conflict services.v4-any.ports.0@3",
+    "warning conflict services.v6-loopback.ports.0@4",
+    "warning conflict services.v6-loopback-long.ports.0@5",
+    "warning conflict services.v4-loopback.ports.0@6",
+    "warning conflict services.v6-any.ports.0@7"
+  ],
+  "nodes": [
+    "service v4-any",
+    "service v6-loopback",
+    "service v6-loopback-long",
+    "service v4-loopback",
+    "service v6-any",
+    "service zero",
+    "network default implicit"
+  ],
+  "edges": [
+    "v4-any -network-> default",
+    "v6-loopback -network-> default",
+    "v6-loopback-long -network-> default",
+    "v4-loopback -network-> default",
+    "v6-any -network-> default",
+    "zero -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "v4-any",
+        "ports": [
+          {
+            "raw": "0.0.0.0:8000:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8000,
+                "end": 8000
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "0.0.0.0",
+            "index": 0
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "v6-loopback",
+        "ports": [
+          {
+            "raw": "[::1]:8000:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8000,
+                "end": 8000
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "::1",
+            "index": 0
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "v6-loopback-long",
+        "ports": [
+          {
+            "raw": "[0:0:0:0:0:0:0:1]:8000:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8000,
+                "end": 8000
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "0:0:0:0:0:0:0:1",
+            "index": 0
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "v4-loopback",
+        "ports": [
+          {
+            "raw": "127.0.0.1:8000:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8000,
+                "end": 8000
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "127.0.0.1",
+            "index": 0
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "v6-any",
+        "ports": [
+          {
+            "raw": "[::]:8000:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8000,
+                "end": 8000
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "::",
+            "index": 0
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "zero",
+        "ports": [
+          {
+            "raw": "0:80",
+            "host": {
+              "kind": "dynamic"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          },
+          {
+            "raw": "0:80",
+            "host": {
+              "kind": "dynamic"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 1
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}
