@@ -12,11 +12,16 @@ export interface AnalysisResult {
 }
 
 /** Analyzes Compose YAML text: parse → normalize → graph. Pure, no I/O. */
+type Severity = Diagnostic["severity"];
+type Counts = Record<Severity, number>;
+const NONE: Counts = { error: 0, warning: 0, info: 0 };
+const SEVERITIES: Severity[] = ["error", "warning", "info"];
+
 export function analyze(text: string): AnalysisResult {
   const parsed = parseYaml(text);
-  if (parsed.value === undefined) return { diagnostics: capped(parsed.diagnostics, 0) };
+  if (parsed.value === undefined) return { diagnostics: capped(parsed.diagnostics, NONE) };
 
-  const { model, diagnostics, suppressed = 0 } = normalize(parsed.value, parsed.locate);
+  const { model, diagnostics, suppressed = NONE } = normalize(parsed.value, parsed.locate);
   if (!model) return { diagnostics: capped(diagnostics, suppressed) };
 
   const built = toGraph(model);
@@ -25,17 +30,30 @@ export function analyze(text: string): AnalysisResult {
   return result;
 }
 
-/** Keeps at most LIMITS.maxDiagnostics and says how many were left out. */
-function capped(diagnostics: Diagnostic[], alreadySuppressed: number): Diagnostic[] {
-  const extra = Math.max(0, diagnostics.length - LIMITS.maxDiagnostics);
-  const omitted = alreadySuppressed + extra;
-  if (omitted === 0) return diagnostics;
+/**
+ * Keeps at most LIMITS.maxDiagnostics, errors first, then warnings, then
+ * infos (file order within each), and summarizes the rest by severity.
+ */
+function capped(diagnostics: Diagnostic[], alreadySuppressed: Counts): Diagnostic[] {
+  const kept = new Set<Diagnostic>();
+  const omitted: Counts = { ...alreadySuppressed };
+  for (const severity of SEVERITIES) {
+    for (const d of diagnostics) {
+      if (d.severity !== severity) continue;
+      if (kept.size < LIMITS.maxDiagnostics) kept.add(d);
+      else omitted[severity]++;
+    }
+  }
+  const total = omitted.error + omitted.warning + omitted.info;
+  const result = diagnostics.filter((d) => kept.has(d));
+  if (total === 0) return result;
+  const parts = SEVERITIES.filter((s) => omitted[s] > 0).map((s) => `${omitted[s]} ${s}${omitted[s] > 1 && s !== "info" ? "s" : ""}`);
   return [
-    ...diagnostics.slice(0, LIMITS.maxDiagnostics),
+    ...result,
     {
       code: "limit",
-      severity: "info",
-      message: `${omitted} more problem${omitted > 1 ? "s were" : " was"} found but not listed.`,
+      severity: SEVERITIES.find((s) => omitted[s] > 0) ?? "info",
+      message: `${total} more problem${total > 1 ? "s" : ""} not listed (${parts.join(", ")}).`,
       location: { path: [] },
     },
   ];

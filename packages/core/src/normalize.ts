@@ -462,7 +462,7 @@ function normalizeResources(ctx: Context, value: unknown, field: "networks" | "v
 export function normalize(
   value: unknown,
   locate: Locate,
-): { model?: ComposeModel; diagnostics: Diagnostic[]; suppressed?: number } {
+): { model?: ComposeModel; diagnostics: Diagnostic[]; suppressed?: Context["suppressed"] } {
   const ctx = new Context(locate);
   if (!isObj(value)) {
     ctx.schema([], "A Compose file must be a mapping with a `services` key.");

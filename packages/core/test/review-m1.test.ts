@@ -146,7 +146,7 @@ describe("Codex review of M2 (86c29eb)", () => {
     const ports = Array.from({ length: 600 }, (_, i) => `"8080:${i + 1}"`).join(", ");
     const r = analyze(`services:\n  a: {image: x, ports: [${ports}]}\n`);
     expect(r.diagnostics).toHaveLength(501);
-    expect(r.diagnostics.at(-1)).toMatchObject({ code: "limit", severity: "info" });
+    expect(r.diagnostics.at(-1)).toMatchObject({ code: "limit", severity: "warning" });
   });
 
   it("rejects more port mappings than the limit", () => {
@@ -159,5 +159,26 @@ describe("Codex review of M2 (86c29eb)", () => {
     const started = performance.now();
     analyze(`services:\n  a: {image: x, ports: [${ports}]}\n`);
     expect(performance.now() - started).toBeLessThan(3000);
+  });
+});
+
+describe("Codex re-review of 51c6f9b", () => {
+  it("treats IPv4-mapped IPv6 as the IPv4 address", () => {
+    const r = analyze('services:\n  a: {image: x, ports: ["127.0.0.1:8080:80"]}\n  b: {image: x, ports: ["[::ffff:127.0.0.1]:8080:80"]}\n');
+    expect(r.diagnostics.map((d) => d.code)).toEqual(["conflict", "conflict"]);
+  });
+
+  it("never drops errors in favor of infos when over the cap", () => {
+    const keys = Array.from({ length: 600 }, (_, i) => `k${i}: 1`).join("\n");
+    const r = analyze(`${keys}\nservices:\n  a: {image: x, depends_on: [missing]}\n`);
+    expect(r.diagnostics.filter((d) => d.code === "reference")).toHaveLength(1);
+    expect(r.diagnostics.at(-1)).toMatchObject({ code: "limit", severity: "info" });
+    expect(r.diagnostics).toHaveLength(501);
+  });
+
+  it("reports the highest omitted severity in the summary", () => {
+    const deps = Array.from({ length: 600 }, (_, i) => `m${i}`).join(", ");
+    const r = analyze(`services:\n  a: {image: x, depends_on: [${deps}]}\n`);
+    expect(r.diagnostics.at(-1)).toMatchObject({ code: "limit", severity: "error" });
   });
 });

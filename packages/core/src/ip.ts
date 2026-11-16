@@ -41,7 +41,14 @@ export function parseIp(text: string): ParsedIp | undefined {
   const v4 = parseIPv4(text);
   if (v4) return { family: 4, canonical: v4.join(".") };
   const v6 = parseIPv6(text.replace(/^\[|\]$/g, ""));
-  if (v6) return { family: 6, canonical: v6.map((g) => g.toString(16)).join(":") };
+  if (v6) {
+    // IPv4-mapped IPv6 (::ffff:a.b.c.d) is the IPv4 address, as Docker unmaps it.
+    if (v6.slice(0, 5).every((g) => g === 0) && v6[5] === 0xffff) {
+      const [hi = 0, lo = 0] = v6.slice(6);
+      return { family: 4, canonical: [hi >> 8, hi & 255, lo >> 8, lo & 255].join(".") };
+    }
+    return { family: 6, canonical: v6.map((g) => g.toString(16)).join(":") };
+  }
   return undefined;
 }
 
