@@ -78,6 +78,7 @@ describe("invalid depends_on and network settings are reported, not normalized",
 
   it.each([
     "123",
+    "null",
     "{condition: never}",
     "{condition: null}",
     "{required: null}",
@@ -113,9 +114,22 @@ describe("Codex re-review of 0bac079", () => {
     expect(codes(analyze(input))).not.toEqual([]);
   });
 
-  it.each(["missing:", ":/data", "a:b:ro:extra", ""])("rejects the volume %j", (spec) => {
+  it.each(["missing:", ":/data", "./data:/data:", "a:b:ro:extra", ""])("rejects the volume %j", (spec) => {
     const r = analyze(`services:\n  a:\n    image: x\n    volumes: ["${spec}"]\n`);
     expect(codes(r)).toEqual(["schema"]);
     expect(r.model!.services[0]!.volumes).toEqual([]);
+  });
+});
+
+describe("Codex re-review of b63f2c0", () => {
+  it("allows an alias that resolves to a scalar as a key", () => {
+    const r = analyze("x-name: &name app\nservices:\n  *name : {image: x}\n");
+    expect(r.diagnostics).toEqual([]);
+    expect(r.model!.services[0]!.name).toBe("app");
+  });
+
+  it("accepts TRUE and FALSE in any case", () => {
+    const r = analyze("services:\n  db: {image: x}\n  a:\n    image: x\n    depends_on:\n      db: {required: FALSE, restart: \"True\"}\n");
+    expect(r.model!.services[1]!.dependsOn[0]).toMatchObject({ required: false, restart: true });
   });
 });

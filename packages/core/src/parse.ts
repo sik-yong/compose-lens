@@ -2,6 +2,7 @@ import {
   LineCounter,
   isMap,
   isNode,
+  isAlias,
   isPair,
   isScalar,
   isSeq,
@@ -70,17 +71,18 @@ const syntaxMessage = (code: ErrorCode) => SYNTAX_MESSAGES[code] ?? `Invalid YAM
  * and non-scalar mapping keys. Compose keys are always strings, and complex or
  * aliased keys would otherwise hide depth and cycles once toJS() stringifies them.
  */
-function checkAst(node: unknown, depth: number): Diagnostic | undefined {
+function checkAst(doc: Document, node: unknown, depth: number): Diagnostic | undefined {
   if (depth > LIMITS.maxDepth) return limitError(`Nesting is deeper than ${LIMITS.maxDepth} levels.`);
   if (isPair(node)) {
-    if (node.key !== null && !isScalar(node.key)) {
+    const key = isAlias(node.key) ? node.key.resolve(doc) : node.key;
+    if (key !== null && key !== undefined && !isScalar(key)) {
       return { code: "schema", severity: "error", message: "Mapping keys must be plain strings.", location: { path: [] } };
     }
-    return checkAst(node.value, depth);
+    return checkAst(doc, node.value, depth);
   }
   if (isMap(node) || isSeq(node)) {
     for (const item of node.items) {
-      const found = checkAst(item, depth + 1);
+      const found = checkAst(doc, item, depth + 1);
       if (found) return found;
     }
   }
@@ -155,7 +157,7 @@ export function parseYaml(text: string): ParsedYaml {
     return { diagnostics, locate };
   }
 
-  const astError = checkAst(doc.contents, 0);
+  const astError = checkAst(doc, doc.contents, 0);
   if (astError) return { diagnostics: [astError], locate };
 
   let value: unknown;

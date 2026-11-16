@@ -154,7 +154,7 @@ function parseShortMount(raw: string): Mount | undefined {
   const parts = splitMountSpec(raw);
   if (parts.length === 1) return raw === "" ? undefined : { kind: "anonymous", target: raw, readOnly: false };
   const [source = "", target = "", mode = ""] = parts;
-  if (parts.length > 3 || source === "" || target === "") return undefined;
+  if (parts.length > 3 || parts.some((part) => part === "")) return undefined;
   return { kind: classifySource(source), source, target, readOnly: mode.split(",").includes("ro") };
 }
 
@@ -200,12 +200,12 @@ const CONDITIONS: readonly DependencyCondition[] = [
   "service_completed_successfully",
 ];
 
-/** Compose accepts booleans and the strings "true"/"false". */
+/** Compose accepts booleans and the strings "true"/"false" in any case. */
 function toBoolean(value: unknown): boolean | undefined {
   if (typeof value === "boolean") return value;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return undefined;
+  if (typeof value !== "string") return undefined;
+  const lower = value.toLowerCase();
+  return lower === "true" ? true : lower === "false" ? false : undefined;
 }
 
 function normalizeDependsOn(ctx: Context, value: unknown, path: DocumentPath): Dependency[] {
@@ -223,11 +223,11 @@ function normalizeDependsOn(ctx: Context, value: unknown, path: DocumentPath): D
     // Invalid entries are reported and dropped, never replaced by a default condition.
     return Object.entries(value).flatMap(([service, options]): Dependency[] => {
       const at = [...path, service];
-      if (options !== null && !isObj(options)) {
+      if (!isObj(options)) {
         ctx.schema(at, "A `depends_on` entry must be a mapping.");
         return [];
       }
-      const opts = options ?? {};
+      const opts = options;
       // An omitted key takes the default; an explicit null is invalid.
       const condition = "condition" in opts ? opts["condition"] : "service_started";
       const required = toBoolean("required" in opts ? opts["required"] : true);
