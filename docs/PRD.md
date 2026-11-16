@@ -7,6 +7,8 @@
 **운영:** GitHub Issues·PR 중심, 수익화 없음
 **핵심 가치:** 정확한 분석 + 쉬운 시각화
 
+> **v0.3.1:** Codex 재검토 P2·P3 8건 반영 (빈 networks 기본 연결, `${VAR+alt}`, 포트 pool 범위, 성공 종료 라벨, 표시·마스킹 경계 통일, 하위 키 규칙, 브라우저 smoke test, README 시제).
+>
 > **v0.3 변경:** Codex PRD 검토(P1~P3 10건) 반영 — 기본 네트워크·`network_mode`, 변수 치환 보류 규칙, 출력 이스케이프, 마스킹 경계, `depends_on` 방향·조건, 포트 충돌 판정, 볼륨 종류 구분, 자원 상한, fixture 기반 완료 기준, 필드별 지원 범위(`docs/support-matrix.md`).
 
 ## 1. 문제 정의
@@ -66,8 +68,8 @@ Docker Engine 연결, 컨테이너 상태·리소스 모니터링, 컨테이너 
 
 ### 6.1 네트워크
 
-- `networks`와 `network_mode`가 모두 없는 서비스는 **암묵적 `default` 네트워크**에 연결한다. 이런 서비스가 하나라도 있으면 `default` 노드를 그린다.
-- `networks`를 명시한 서비스는 명시한 네트워크에만 연결한다 (`default`도 명시해야 연결).
+- `network_mode`가 없고 `networks`가 **생략됐거나 비어 있는**(`[]`, `{}`) 서비스는 **암묵적 `default` 네트워크**에 연결한다. 이런 서비스가 하나라도 있으면 `default` 노드를 그린다.
+- 비어 있지 않은 `networks`를 명시한 서비스는 명시한 네트워크에만 연결한다 (`default`도 명시해야 연결).
 - `network_mode`:
   - `none` — 네트워크 연결 없음.
   - `host` — 네트워크 노드에 연결하지 않고 "host network" 배지 표시.
@@ -84,15 +86,18 @@ Docker Engine 연결, 컨테이너 상태·리소스 모니터링, 컨테이너 
 - 조건별 라벨:
   - 짧은 형식 / `service_started` — "starts after" (준비 완료를 보장하지 않음)
   - `service_healthy` — "after healthy"
-  - `service_completed_successfully` — "after completes"
+  - `service_completed_successfully` — "after successful completion" (실패 종료면 시작하지 않음)
 - `required: false` — 선택 의존으로 구분 표시. `restart: true` — 상세 패널에 표시.
 - 통신 흐름으로 표현하지 않는다.
 
 ### 6.3 포트
 
-- 짧은·긴 형식을 `{hostIp?, hostPort? (단일|범위), containerPort (단일|범위), protocol}`로 정규화한다.
-- `"80"`처럼 호스트 포트가 없으면 **동적 할당**이다. 고정 호스트 포트 80으로 해석하지 않는다.
-- **잠재 충돌** 판정: 같은 프로토콜 + 고정 호스트 포트(범위) 겹침 + 호스트 IP 겹침(미지정은 모든 인터페이스로 간주). 동적 할당·변수 포함 포트는 판정에서 제외한다.
+- 짧은·긴 형식을 `{hostIp?, host, containerPort (단일|범위), protocol}`로 정규화한다. `host`는 세 종류다.
+  - **fixed** — 고정 호스트 포트 또는 컨테이너 범위와 크기가 같은 호스트 범위 (`"8080:80"`, `"9090-9091:8080-8081"`): 해당 포트를 모두 점유.
+  - **dynamic** — 호스트 포트 없음 (`"80"`): 임의 포트 할당. 고정 호스트 포트 80으로 해석하지 않는다.
+  - **pool** — 단일 컨테이너 포트에 대한 호스트 범위 (`"8000-8010:80"`, 긴 형식 `published: "8000-8010"` + 단일 `target`): 범위 안의 **가용 포트 하나**를 할당. 범위 전체를 점유하지 않는다.
+- **잠재 충돌** 판정: fixed끼리만, 같은 프로토콜 + 포트 겹침 + 호스트 IP 겹침(미지정은 모든 인터페이스로 간주). dynamic·pool·변수 포함 포트는 판정에서 제외한다 (pool과 fixed의 겹침은 info로 안내).
+- 긴 형식의 `name`, `app_protocol`은 표시만 하고, `mode`(`host`/`ingress`, Swarm 전용 의미)는 분석하지 않는다고 안내한다.
 - 진단 문구는 "이 파일 안에서 충돌 가능"이며, 호스트의 실제 점유는 확인하지 않는다.
 - profiles는 평가하지 않으므로 모든 서비스를 동시에 활성으로 가정한다 (support matrix에 명시).
 
@@ -111,7 +116,7 @@ Docker Engine 연결, 컨테이너 상태·리소스 모니터링, 컨테이너 
 ### 6.5 변수 치환
 
 - v0.1은 치환하지 않는다. `.env`·환경을 읽지 않는다.
-- `${VAR}`, `${VAR:-default}`, `${VAR-default}`, `${VAR:?err}`, `${VAR?err}`, `${VAR:+alt}`, `$VAR`를 감지한다. `$$`는 리터럴 `$`.
+- `${VAR}`, `${VAR:-default}`, `${VAR-default}`, `${VAR:?err}`, `${VAR?err}`, `${VAR:+alt}`, `${VAR+alt}`, `$VAR`와 중첩 표현식(`${A:-${B}}`)을 감지한다. `$$`는 리터럴 `$`이므로 `$$VAR`는 변수가 아니다.
 - 감지된 값은 **원문 표현식을 보존**하고 "미해결" 표시한다. 기본값이 있어도 확정하지 않는다.
 - 미해결 값에 의존하는 판정(포트 충돌, 참조 검증, `network_mode` 해석 등)은 **보류**하고 그 사실을 진단으로 알린다. 오류로도, 정상으로도 단정하지 않는다.
 
@@ -119,6 +124,7 @@ Docker Engine 연결, 컨테이너 상태·리소스 모니터링, 컨테이너 
 
 - 지원하지 않는 필드는 조용히 무시하지 않고 "분석하지 않음" 진단을 낸다.
 - `include`, `extends`처럼 결과 구조를 바꾸는 필드는 "결과가 불완전할 수 있음" 경고.
+- 분석 대상 객체(포트·네트워크·볼륨·`build`·`depends_on` 등)라도 **support matrix에 나열하지 않은 하위 키는 "분석하지 않음"**으로 안내한다. 해석에 영향을 주는 키는 관련 진단의 한계도 함께 알린다.
 - `x-*` 확장 필드는 명세상 정상이므로 경고하지 않는다.
 - YAML 앵커·별칭·병합 키(`<<`)는 지원한다 (§8.3 상한 적용).
 
@@ -171,7 +177,9 @@ Docker Engine 연결, 컨테이너 상태·리소스 모니터링, 컨테이너 
   - `env_file`은 경로만 표시한다 (파일을 읽지 않음).
   - `secrets`·`configs`는 이름만 표시한다.
   - 진단 메시지는 값을 인용하지 않고 위치·키로 안내한다.
-- **보장 범위 밖:** `command`, `entrypoint`, `labels`, `healthcheck`, 인증정보가 포함된 이미지·URL 등 다른 필드의 비밀값은 자동 보호하지 않는다. v0.1은 이 필드들을 상세 패널에 표시하지 않으며, README에 이 경계를 명시한다.
+- **표시하지 않는 필드:** `command`, `entrypoint`, `labels`, `healthcheck.test` (비밀값이 흔히 들어가므로).
+- **표시하지만 비밀 탐지를 보장하지 않는 값:** `image`, `build.context`, `build.dockerfile`, 경로, 리소스 이름. URL 형태 값의 사용자 정보(`scheme://user:pass@`)는 최선 노력으로 가리지만 보장하지 않는다.
+- README와 support matrix에 이 경계를 같은 문구로 명시한다.
 
 ## 9. 기술 스택
 
@@ -197,12 +205,12 @@ React + TypeScript + Vite, @xyflow/react, yaml, dagre, Tailwind CSS, Vitest, Git
 
 - **fixture 테스트:** support matrix의 "분석" 항목마다 `fixtures/<case>/compose.yaml` + 기대 그래프·진단(`expected.json`)이 있고 통과한다. 최소 포함:
   - 짧은·긴 형식 동등성 (ports, volumes, depends_on, networks)
-  - 암묵적 `default` 네트워크, `network_mode` 각 값, `networks`+`network_mode` 오류
+  - 암묵적 `default` 네트워크 (생략·`[]`·`{}`), `network_mode` 각 값, `networks`+`network_mode` 오류
   - `depends_on` 방향과 세 조건, `required: false`
-  - 포트: 동적 할당, 프로토콜 차이, 호스트 IP 차이, 범위 겹침
+  - 포트: fixed / dynamic / pool 구분, 프로토콜 차이, 호스트 IP 차이, fixed 범위 겹침
   - 볼륨: named / bind / anonymous / tmpfs 구분, 익명 볼륨 비공유
-  - 변수 치환: 미해결 표시와 판정 보류
-  - 미지원 필드, `x-*` 무경고, 앵커·병합 키
+  - 변수 치환: 모든 감지 형식과 중첩, `$$VAR` 비감지, 미해결 표시와 판정 보류
+  - 미지원 필드·미지원 하위 키, `x-*` 무경고, 앵커·병합 키
   - YAML 문법 오류 vs 참조 오류 구분
 - **보안 테스트:**
   - 마스킹: 비밀값 fixture의 값 문자열이 모든 생성 결과(그래프 데이터, 진단, Mermaid)에 나타나지 않는다.
@@ -212,6 +220,7 @@ React + TypeScript + Vite, @xyflow/react, yaml, dagre, Tailwind CSS, Vitest, Git
 
 ### 수동 (`docs/verification.md`에 절차·결과 기록)
 
-- Mermaid 출력이 GitHub Markdown에서 렌더링된다.
+- **브라우저 smoke test** (최신 Chrome 기준, Firefox·Safari는 가능하면): 업로드·붙여넣기 → 진단·그래프·상세 패널 → Mermaid 내보내기(복사·파일 저장)가 동작한다.
+- 내보낸 Mermaid가 GitHub Markdown에서 렌더링된다.
 - 배포본에서 입력을 넣은 뒤 DevTools 네트워크 탭에 외부 요청이 없다.
 - 3개 이상 서비스의 실사용 형태 예제가 시각화되고, 상세 패널에 포트·볼륨·네트워크가 누락 없이 나온다.

@@ -16,13 +16,15 @@ This document is the source of truth for what Compose Lens understands. If the a
 | **Noted** | Not analyzed; an `unsupported` diagnostic says so |
 | **Ignored** | Accepted silently (valid per spec, no effect on the result) |
 
+**Sub-keys rule:** Inside any Analyzed or Shown object (a port, network, volume, `build`, `depends_on` entry, …), a sub-key not listed in this file is **Noted**. When it can change the interpretation, the diagnostic also says which check it limits.
+
 ## Top-level elements
 
 | Element | Level | Notes |
 |---|---|---|
 | `services` | Analyzed | Must be a mapping, otherwise a `schema` error |
-| `networks` | Analyzed | `external`, `name`, `driver` shown. External networks are marked "existence not verified" |
-| `volumes` | Analyzed | `external`, `name`, `driver` shown. External volumes are marked "existence not verified" |
+| `networks` | Analyzed | `external`, `name`, `driver`, `internal` shown. External networks are marked "existence not verified". `driver_opts`, `ipam`, `attachable`, `enable_ipv6`, `labels`: Noted |
+| `volumes` | Analyzed | `external`, `name`, `driver` shown. External volumes are marked "existence not verified". `driver_opts`, `labels`: Noted |
 | `name` | Shown | Project name |
 | `version` | Noted | Obsolete in the spec. Info diagnostic only |
 | `secrets`, `configs` | Shown (names only) | Contents and files are never read |
@@ -34,9 +36,9 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 | Attribute | Level | Notes |
 |---|---|---|
-| `image` | Shown | |
+| `image` | Shown | No secret detection guaranteed. See [Masking boundary](#masking-boundary) |
 | `build` | Analyzed (partial) | String or object. `context`, `dockerfile`, `target` shown. `args`: **Masked**. Other `build` keys: Noted |
-| `ports` | Analyzed | Short and long syntax, ranges, host IP, protocol. See [Ports](#ports) |
+| `ports` | Analyzed | Short and long syntax, ranges, host IP, protocol. Long syntax: `target`, `published`, `host_ip`, `protocol` analyzed. `name` and `app_protocol` shown. `mode` Noted. See [Ports](#ports) |
 | `expose` | Shown | |
 | `networks` | Analyzed | List and mapping syntax. `aliases`, `ipv4_address`, `ipv6_address` shown |
 | `network_mode` | Analyzed | `none`, `host`, `service:<name>`, `container:<id>`. See [Networks](#networks) |
@@ -60,8 +62,8 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 ### Networks
 
-- A service with neither `networks` nor `network_mode` joins the implicit `default` network.
-- A service that lists `networks` joins only those networks (it must list `default` explicitly to join it).
+- A service without `network_mode` whose `networks` is missing or empty (`[]`, `{}`) joins the implicit `default` network.
+- A service with a non-empty `networks` joins only those networks (it must list `default` explicitly to join it).
 - `network_mode: none` means no network. `host` shows a "host network" badge with no network edges.
 - `network_mode: service:<name>` draws a "shares network stack" edge. A missing target is a `reference` error.
 - `network_mode: container:<id>` is shown as an external container (`unverifiable`).
@@ -71,16 +73,22 @@ This document is the source of truth for what Compose Lens understands. If the a
 ### depends_on
 
 - Edge direction: **dependent → dependency.** `web: depends_on: [db]` draws `web → db` ("web starts after db").
-- Labels: short syntax or `service_started` gives "starts after" (readiness not guaranteed). `service_healthy` gives "after healthy". `service_completed_successfully` gives "after completes".
+- Labels: short syntax or `service_started` gives "starts after" (readiness not guaranteed). `service_healthy` gives "after healthy". `service_completed_successfully` gives "after successful completion" (the dependent does not start if the dependency fails).
 - `required: false` is drawn as an optional dependency. `restart: true` is shown in the detail panel.
 - It is never presented as traffic or communication.
 
 ### Ports
 
-- Normalized to `{ hostIp?, hostPort? (single | range), containerPort (single | range), protocol }`.
-- No host port (`"80"`) means the host port is **dynamically assigned**, not host port 80.
-- **Potential conflict:** same protocol, overlapping fixed host ports, and overlapping host IP. An unset IP counts as all interfaces.
-- Excluded from conflict checks: dynamic ports and ports containing variables.
+- Normalized to `{ hostIp?, host, containerPort (single | range), protocol }`. `host` takes one of three forms:
+
+| Host binding | Example | Meaning |
+|---|---|---|
+| fixed | `"8080:80"`, `"9090-9091:8080-8081"` | Occupies every listed host port |
+| dynamic | `"80"` | The host port is **assigned at random**. It is not host port 80 |
+| pool | `"8000-8010:80"`, or `published: "8000-8010"` with a single `target` | **One** free port from the range is assigned. The whole range is not occupied |
+
+- **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP counts as all interfaces.
+- Excluded from conflict checks: dynamic and pool bindings, and ports containing variables. A pool that overlaps a fixed binding gets an info note.
 - Conflicts are reported as "may conflict within this file". Actual host usage is not checked. Profiles are not evaluated.
 
 ### Volumes
@@ -96,7 +104,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 ### Variable interpolation
 
 - **Not resolved in v0.1.** `.env` and environment variables are not read.
-- Detected forms: `${VAR}`, `${VAR:-d}`, `${VAR-d}`, `${VAR:?e}`, `${VAR?e}`, `${VAR:+a}`, `$VAR`. `$$` is a literal `$`.
+- Detected forms: `${VAR}`, `${VAR:-d}`, `${VAR-d}`, `${VAR:?e}`, `${VAR?e}`, `${VAR:+a}`, `${VAR+a}`, `$VAR`, and nested expressions such as `${A:-${B}}`. `$$` is a literal `$`, so `$$VAR` is not a variable.
 - Values keep their original expression and are marked *unresolved*, even when a default exists.
 - Checks that depend on an unresolved value are **deferred** with an `unresolved` diagnostic. They are reported neither as errors nor as OK.
 
@@ -119,4 +127,5 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 Values of `environment` and `build.args` never appear in generated output: the graph data, detail panel, diagnostics, Mermaid export, or logs. `secrets`, `configs`, and `env_file` show names or paths only.
 
-**Not protected:** secrets embedded in `command`, `entrypoint`, `labels`, `healthcheck.test`, image references, or URLs. v0.1 does not display those fields, but Compose Lens does not detect or redact secrets in them.
+- **Not displayed:** `command`, `entrypoint`, `labels`, and `healthcheck.test`. Secrets often live there.
+- **Displayed, no secret detection guaranteed:** `image`, `build.context`, `build.dockerfile`, paths, and resource names. Credentials in URL-like values (`scheme://user:pass@…`) are hidden on a best-effort basis only.

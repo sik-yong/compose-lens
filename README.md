@@ -2,16 +2,16 @@
 
 **See the structure of a Docker Compose file at a glance, right in your browser.**
 
-Paste or drop a `compose.yaml` and Compose Lens draws its services, networks, and volumes as a graph. It flags configuration problems and exports a Mermaid diagram for your README.
+Compose Lens will let you paste or drop a `compose.yaml` and see its services, networks, and volumes as a graph. It will also flag configuration problems and export a Mermaid diagram for your README.
 
-> **Status: pre-alpha.** The design is settled ([PRD](docs/PRD.md), Korean). Implementation of v0.1.0 has not started yet.
+> **Status: pre-alpha, not usable yet.** Implementation of v0.1.0 has not started. Everything below describes planned behavior. The design is in the [PRD](docs/PRD.md) (Korean) and the [support matrix](docs/support-matrix.md), and is still being reviewed.
 
 ## Why
 
 YAML gets hard to read once a stack has more than a handful of services. Compose Lens aims to be **accurate first**:
 
-- It only states what the file actually configures. `depends_on` is shown as start order, never as traffic. Sharing a network means "on the same network", not "talks to".
-- It doesn't guess. Unresolved `${VARIABLES}`, external resources, and unsupported fields are labeled, not silently filled in or ignored.
+- It will only state what the file actually configures. `depends_on` is shown as start order, never as traffic. Sharing a network means "on the same network", not "talks to".
+- It won't guess. Unresolved `${VARIABLES}`, external resources, and unsupported fields will be labeled, not silently filled in or ignored.
 - What's supported and what isn't is written down in the [support matrix](docs/support-matrix.md).
 
 ## Planned for v0.1.0
@@ -26,10 +26,11 @@ YAML gets hard to read once a stack has more than a handful of services. Compose
   - Unsupported fields
 - Mermaid export
 
-## Privacy
+## Privacy (design goals)
 
-- **Local only:** Everything runs in your browser. Your Compose file is never uploaded, and the app loads no external CDNs, fonts, or analytics.
-- **Masked values:** Values of `environment` and `build.args` are hidden in all generated output. Secrets embedded elsewhere, such as in `command`, `labels`, or URLs, are *not* detected. See the [masking boundary](docs/support-matrix.md#masking-boundary).
+- **Local only:** Processing will happen entirely in your browser. Your Compose file is never uploaded, and the app will load no external CDNs, fonts, or analytics.
+- **Masked values:** Values of `environment` and `build.args` will be hidden in all generated output.
+- **Limits:** `command`, `entrypoint`, `labels`, and `healthcheck.test` are not displayed. Secrets inside displayed values, such as image references or URLs, are not guaranteed to be detected. See the [masking boundary](docs/support-matrix.md#masking-boundary).
 
 ## Out of scope
 
