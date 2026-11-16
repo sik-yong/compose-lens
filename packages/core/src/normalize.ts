@@ -44,13 +44,37 @@ function parseRange(text: string): PortRange | undefined {
 
 const rangeSize = (r: PortRange) => r.end - r.start + 1;
 
-function hostBinding(host: string | undefined, container: PortRange | undefined): PortMapping["host"] {
+/**
+ * Classifies the host side. Returns undefined for invalid mappings, following
+ * Docker's parser: a host range must match the container range size, except
+ * that a host range with a single container port is a pool.
+ */
+function hostBinding(host: string | undefined, container: PortRange | undefined): PortMapping["host"] | undefined {
   if (host === undefined || host === "") return { kind: "dynamic" };
   if (hasVariable(host)) return { kind: "unresolved" };
   const ports = parseRange(host);
-  if (!ports) return { kind: "unresolved" };
-  if (rangeSize(ports) > 1 && container && rangeSize(container) === 1) return { kind: "pool", ports };
-  return { kind: "fixed", ports };
+  if (!ports) return undefined;
+  if (!container) return { kind: "unresolved" }; // container side has a variable
+  if (rangeSize(container) === 1) return rangeSize(ports) > 1 ? { kind: "pool", ports } : { kind: "fixed", ports };
+  return rangeSize(ports) === rangeSize(container) ? { kind: "fixed", ports } : undefined;
+}
+
+function makePort(
+  raw: string,
+  hostText: string | undefined,
+  containerText: string,
+  protocol: string,
+  hostIp: string | undefined,
+): PortMapping | undefined {
+  const containerHasVariable = hasVariable(containerText);
+  const container = containerHasVariable ? undefined : parseRange(containerText);
+  if (!container && !containerHasVariable) return undefined;
+  const host = hostBinding(hostText, container);
+  if (!host) return undefined;
+  const mapping: PortMapping = { raw, host, protocol };
+  if (container) mapping.container = container;
+  if (hostIp) mapping.hostIp = hostIp;
+  return mapping;
 }
 
 function parseShortPort(raw: string): PortMapping | undefined {
@@ -72,28 +96,17 @@ function parseShortPort(raw: string): PortMapping | undefined {
   const containerText = parts.pop() ?? "";
   const hostText = parts.length > 0 ? parts.pop() : undefined;
   if (hostIp === undefined && parts.length > 0) hostIp = parts.join(":");
-
-  const container = hasVariable(containerText) ? undefined : parseRange(containerText);
-  if (!container && !hasVariable(containerText)) return undefined;
-  const mapping: PortMapping = { raw, host: hostBinding(hostText, container), protocol };
-  if (container) mapping.container = container;
-  if (hostIp) mapping.hostIp = hostIp;
-  return mapping;
+  return makePort(raw, hostText, containerText, protocol, hostIp);
 }
 
 function parseLongPort(entry: Obj): PortMapping | undefined {
   const target = str(entry["target"]);
   if (target === undefined) return undefined;
-  const container = hasVariable(target) ? undefined : parseRange(target);
-  if (!container && !hasVariable(target)) return undefined;
   const published = str(entry["published"]);
   const hostIp = str(entry["host_ip"]);
   const protocol = str(entry["protocol"]) ?? "tcp";
   const raw = `${hostIp ? `${hostIp}:` : ""}${published ? `${published}:` : ""}${target}/${protocol}`;
-  const mapping: PortMapping = { raw, host: hostBinding(published, container), protocol };
-  if (container) mapping.container = container;
-  if (hostIp) mapping.hostIp = hostIp;
-  return mapping;
+  return makePort(raw, published, target, protocol, hostIp);
 }
 
 function normalizePorts(ctx: Context, value: unknown, path: DocumentPath): PortMapping[] {
@@ -107,24 +120,43 @@ function normalizePorts(ctx: Context, value: unknown, path: DocumentPath): PortM
     const text = str(entry);
     const mapping = text !== undefined ? parseShortPort(text) : isObj(entry) ? parseLongPort(entry) : undefined;
     if (mapping) result.push(mapping);
-    else ctx.schema([...path, i], "Unrecognized port format.");
+    else ctx.schema([...path, i], "Invalid port mapping.");
   });
   return result;
 }
 
 // ---------- volumes ----------
 
+const WINDOWS_PATH = /^[A-Za-z]:[\\/]/;
+
 function classifySource(source: string): Mount["kind"] {
   if (hasVariable(source)) return "unresolved";
+  if (WINDOWS_PATH.test(source) || source.startsWith("\\\\")) return "bind";
   return /^(\/|\.\/|\.\.\/|~|\.$|\.\.$)/.test(source) ? "bind" : "named";
 }
 
+/** Splits on ":" but keeps a Windows drive prefix (C:\ or C:/) inside the part. */
+function splitMountSpec(raw: string): string[] {
+  const parts: string[] = [];
+  let rest = raw;
+  while (rest.length > 0) {
+    const skip = WINDOWS_PATH.test(rest) ? 2 : 0;
+    const colon = rest.indexOf(":", skip);
+    if (colon < 0) {
+      parts.push(rest);
+      break;
+    }
+    parts.push(rest.slice(0, colon));
+    rest = rest.slice(colon + 1);
+  }
+  return parts;
+}
+
 function parseShortMount(raw: string): Mount {
-  const parts = raw.split(":");
+  const parts = splitMountSpec(raw);
   if (parts.length === 1) return { kind: "anonymous", target: raw, readOnly: false };
   const [source = "", target = "", mode = ""] = parts;
-  const mount: Mount = { kind: classifySource(source), source, target, readOnly: mode.split(",").includes("ro") };
-  return mount;
+  return { kind: classifySource(source), source, target, readOnly: mode.split(",").includes("ro") };
 }
 
 function parseLongMount(entry: Obj): Mount | undefined {
@@ -181,20 +213,39 @@ function normalizeDependsOn(ctx: Context, value: unknown, path: DocumentPath): D
     });
   }
   if (isObj(value)) {
-    return Object.entries(value).map(([service, options]) => {
-      const opts = isObj(options) ? options : {};
-      const condition = str(opts["condition"]);
-      if (condition !== undefined && !CONDITIONS.includes(condition as DependencyCondition)) {
-        ctx.schema([...path, service, "condition"], "Unknown `depends_on` condition.");
+    // Invalid entries are reported and dropped, never replaced by a default condition.
+    return Object.entries(value).flatMap(([service, options]): Dependency[] => {
+      const at = [...path, service];
+      if (options !== null && !isObj(options)) {
+        ctx.schema(at, "A `depends_on` entry must be a mapping.");
+        return [];
       }
-      return {
-        service,
-        condition: CONDITIONS.includes(condition as DependencyCondition)
-          ? (condition as DependencyCondition)
-          : "service_started",
-        required: opts["required"] !== false,
-        restart: opts["restart"] === true,
-      };
+      const opts = options ?? {};
+      const condition = opts["condition"] ?? "service_started";
+      const required = opts["required"] ?? true;
+      const restart = opts["restart"] ?? false;
+      let valid = true;
+      if (!CONDITIONS.includes(condition as DependencyCondition)) {
+        ctx.schema([...at, "condition"], "Unknown `depends_on` condition.");
+        valid = false;
+      }
+      if (typeof required !== "boolean") {
+        ctx.schema([...at, "required"], "`required` must be true or false.");
+        valid = false;
+      }
+      if (typeof restart !== "boolean") {
+        ctx.schema([...at, "restart"], "`restart` must be true or false.");
+        valid = false;
+      }
+      if (!valid) return [];
+      return [
+        {
+          service,
+          condition: condition as DependencyCondition,
+          required: required as boolean,
+          restart: restart as boolean,
+        },
+      ];
     });
   }
   ctx.schema(path, "`depends_on` must be a list or a mapping.");
@@ -219,7 +270,8 @@ function normalizeServiceNetworks(
     ctx.schema(path, "`networks` must be a list or a mapping.");
   }
   if (networkMode !== undefined) {
-    if (names.length > 0) ctx.schema(path, "`networks` and `network_mode` can't be used together.");
+    // Compose rejects the combination even when `networks` is empty.
+    if (value !== undefined) ctx.schema(path, "`networks` and `network_mode` can't be used together.");
     return [];
   }
   if (names.length === 0) return [{ name: "default", implicit: true }];

@@ -1,4 +1,13 @@
-import { LineCounter, isNode, parseDocument, type Document } from "yaml";
+import {
+  LineCounter,
+  isMap,
+  isNode,
+  isPair,
+  isSeq,
+  parseDocument,
+  type Document,
+  type ErrorCode,
+} from "yaml";
 import type { Diagnostic, DiagnosticLocation, DocumentPath } from "./diagnostics.js";
 import { LIMITS } from "./limits.js";
 
@@ -10,6 +19,8 @@ export interface ParsedYaml {
   locate: (path: DocumentPath) => DiagnosticLocation;
 }
 
+const isLowSurrogate = (code: number) => code >= 0xdc00 && code <= 0xdfff;
+
 /** UTF-8 byte length without TextEncoder (core has no DOM/Node globals). */
 export function utf8Length(text: string): number {
   let bytes = 0;
@@ -17,10 +28,10 @@ export function utf8Length(text: string): number {
     const code = text.charCodeAt(i);
     if (code < 0x80) bytes += 1;
     else if (code < 0x800) bytes += 2;
-    else if (code >= 0xd800 && code <= 0xdbff && i + 1 < text.length) {
-      bytes += 4;
+    else if (code >= 0xd800 && code <= 0xdbff && isLowSurrogate(text.charCodeAt(i + 1))) {
+      bytes += 4; // a valid surrogate pair is one 4-byte code point
       i++;
-    } else bytes += 3;
+    } else bytes += 3; // BMP character, or a lone surrogate (encoded as U+FFFD)
   }
   return bytes;
 }
@@ -31,6 +42,35 @@ const limitError = (message: string): Diagnostic => ({
   message,
   location: { path: [] },
 });
+
+/**
+ * Fixed messages per yaml error code. yaml's own messages can quote the input
+ * (e.g. a block scalar header), which may contain secrets, so they are never shown.
+ */
+const SYNTAX_MESSAGES: Partial<Record<ErrorCode, string>> = {
+  BAD_INDENT: "Bad indentation.",
+  TAB_AS_INDENT: "Tabs can't be used for indentation.",
+  DUPLICATE_KEY: "Duplicate key.",
+  BAD_SCALAR_START: "A value can't start with this character.",
+  BLOCK_IN_FLOW: "Block syntax can't be used inside [ ] or { }.",
+  MISSING_CHAR: "A closing bracket, brace, or quote is missing.",
+  MULTILINE_IMPLICIT_KEY: "A key can't span multiple lines.",
+  BLOCK_AS_IMPLICIT_KEY: "A nested block can't be used as a key.",
+  BAD_ALIAS: "An alias refers to an anchor that isn't defined before it.",
+  MULTIPLE_DOCS: "Only one YAML document is supported.",
+  BAD_DQ_ESCAPE: "Invalid escape sequence in a double-quoted string.",
+  UNEXPECTED_TOKEN: "Unexpected token.",
+};
+
+const syntaxMessage = (code: ErrorCode) => SYNTAX_MESSAGES[code] ?? `Invalid YAML (${code}).`;
+
+/** Rejects YAML ASTs nested deeper than LIMITS.maxDepth, counting keys as well as values. */
+function checkAstDepth(node: unknown, depth: number): boolean {
+  if (depth > LIMITS.maxDepth) return false;
+  if (isPair(node)) return checkAstDepth(node.key, depth) && checkAstDepth(node.value, depth);
+  if (isMap(node) || isSeq(node)) return node.items.every((item) => checkAstDepth(item, depth + 1));
+  return true; // scalars and aliases (aliases are bounded by maxAliasCount and checkShape)
+}
 
 /** Rejects cycles (from recursive aliases) and nesting deeper than LIMITS.maxDepth. */
 function checkShape(value: unknown): Diagnostic | undefined {
@@ -74,7 +114,14 @@ export function parseYaml(text: string): ParsedYaml {
   }
 
   try {
-    doc = parseDocument(text, { lineCounter, merge: true, uniqueKeys: true, prettyErrors: false });
+    // logLevel "silent": yaml otherwise logs warnings that can quote input values.
+    doc = parseDocument(text, {
+      lineCounter,
+      merge: true,
+      uniqueKeys: true,
+      prettyErrors: false,
+      logLevel: "silent",
+    });
   } catch {
     // Very deep flow collections can exhaust the parser's stack.
     return { diagnostics: [limitError("The document is too deeply nested to parse.")], locate };
@@ -86,12 +133,15 @@ export function parseYaml(text: string): ParsedYaml {
       return {
         code: "yaml-syntax",
         severity: "error",
-        // yaml's messages describe syntax, not values, so they are safe to show.
-        message: error.message.split("\n")[0] ?? "Invalid YAML.",
+        message: syntaxMessage(error.code),
         location: { line: pos.line, column: pos.col },
       };
     });
     return { diagnostics, locate };
+  }
+
+  if (!checkAstDepth(doc.contents, 0)) {
+    return { diagnostics: [limitError(`Nesting is deeper than ${LIMITS.maxDepth} levels.`)], locate };
   }
 
   let value: unknown;
