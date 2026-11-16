@@ -1,0 +1,19 @@
+{
+  "name": "@compose-lens/core",
+  "version": "0.0.0",
+  "description": "Docker Compose parser, diagnostics, and graph conversion for Compose Lens. No UI or DOM dependencies.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

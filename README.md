@@ -49,6 +49,16 @@ examples/        Sample Compose files
 docs/            PRD, support matrix, verification notes
 ```
 
+## Development
+
+Requires Node.js 22 or later.
+
+```sh
+npm install
+npm run dev     # start the web app
+npm run check   # typecheck, test, and build all workspaces
+```
+
 ## Contributing
 
 Issues and discussions are welcome. Contribution guidelines will be added before v0.1.0.
