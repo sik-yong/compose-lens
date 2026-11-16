@@ -86,7 +86,7 @@ Docker Engine 연결, 컨테이너 상태·리소스 모니터링, 컨테이너 
 - 조건별 라벨:
   - 짧은 형식 / `service_started` — "starts after" (준비 완료를 보장하지 않음)
   - `service_healthy` — "after healthy"
-  - `service_completed_successfully` — "after successful completion" (실패 종료면 시작하지 않음)
+  - `service_completed_successfully` — "after successful completion" (필수 의존이면 대상이 실패 종료할 때 시작하지 않음. `required: false`면 경고 후 진행할 수 있음)
 - `required: false` — 선택 의존으로 구분 표시. `restart: true` — 상세 패널에 표시.
 - 통신 흐름으로 표현하지 않는다.
 

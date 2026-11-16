@@ -73,7 +73,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 ### depends_on
 
 - Edge direction: **dependent → dependency.** `web: depends_on: [db]` draws `web → db` ("web starts after db").
-- Labels: short syntax or `service_started` gives "starts after" (readiness not guaranteed). `service_healthy` gives "after healthy". `service_completed_successfully` gives "after successful completion" (the dependent does not start if the dependency fails).
+- Labels: short syntax or `service_started` gives "starts after" (readiness not guaranteed). `service_healthy` gives "after healthy". `service_completed_successfully` gives "after successful completion" (with a required dependency, the dependent does not start if the dependency fails. With `required: false`, Compose warns and continues).
 - `required: false` is drawn as an optional dependency. `restart: true` is shown in the detail panel.
 - It is never presented as traffic or communication.
 
