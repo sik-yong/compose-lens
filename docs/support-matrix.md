@@ -4,7 +4,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 - **Baseline:** [Compose Specification](https://docs.docker.com/reference/compose-file/) as of 2026-11.
 - **Scope:** A single Compose file. Every result describes the *configuration in the file*. Compose Lens never inspects a host or Docker Engine.
-- **Status:** Planned for v0.1.0 (not implemented yet).
+- **Status:** Planned for v0.1.0 (in progress). Items marked *(v0.1.1+)* are deferred and listed under [Known limitations in v0.1.0](#known-limitations-in-v010).
 
 ## Legend
 
@@ -16,7 +16,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 | **Noted** | Not analyzed; an `unsupported` diagnostic says so |
 | **Ignored** | Accepted silently (valid per spec, no effect on the result) |
 
-**Sub-keys rule:** Inside any Analyzed or Shown object (a port, network, volume, `build`, `depends_on` entry, …), a sub-key not listed in this file is **Noted**. When it can change the interpretation, the diagnostic also says which check it limits.
+**Sub-keys rule** *(v0.1.1+)*: Inside any Analyzed or Shown object (a port, network, volume, `build`, `depends_on` entry, …), a sub-key not listed in this file is **Noted**. When it can change the interpretation, the diagnostic also says which check it limits.
 
 ## Top-level elements
 
@@ -88,7 +88,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 | pool | `"8000-8010:80"`, or `published: "8000-8010"` with a single `target` | **One** free port from the range is assigned. The whole range is not occupied |
 
 - **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP counts as all interfaces.
-- Excluded from conflict checks: dynamic and pool bindings, and ports containing variables. A pool that overlaps a fixed binding gets an info note.
+- Excluded from conflict checks: dynamic and pool bindings, and ports containing variables. A note for a pool overlapping a fixed binding is *(v0.1.1+)*.
 - Conflicts are reported as "may conflict within this file". Actual host usage is not checked. Profiles are not evaluated.
 
 ### Volumes
@@ -128,4 +128,12 @@ This document is the source of truth for what Compose Lens understands. If the a
 Values of `environment` and `build.args` never appear in generated output: the graph data, detail panel, diagnostics, Mermaid export, or logs. `secrets`, `configs`, and `env_file` show names or paths only.
 
 - **Not displayed:** `command`, `entrypoint`, `labels`, and `healthcheck.test`. Secrets often live there.
-- **Displayed, no secret detection guaranteed:** `image`, `build.context`, `build.dockerfile`, paths, and resource names. Credentials in URL-like values (`scheme://user:pass@…`) are hidden on a best-effort basis only.
+- **Displayed, no secret detection guaranteed:** `image`, `build.context`, `build.dockerfile`, paths, and resource names. Hiding credentials in URL-like values (`scheme://user:pass@…`) is *(v0.1.1+)*.
+
+## Known limitations in v0.1.0
+
+These are known gaps, not silent behavior. They are planned for v0.1.1 or later.
+
+- **Sub-keys:** Sub-keys not listed in this file are not analyzed and not reported. Top-level and service-level unsupported fields *are* reported.
+- **Port pools:** No note when a pool range overlaps a fixed binding. Pools are still excluded from conflict checks.
+- **URL credentials:** Credentials inside displayed values such as `image` or `build.context` are shown as written.
