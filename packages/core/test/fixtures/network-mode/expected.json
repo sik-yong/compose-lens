@@ -1,0 +1,215 @@
+{
+  "diagnostics": [
+    "error schema services.both.networks@10",
+    "error reference services.missing-target.network_mode@6",
+    "info unverifiable services.container.network_mode@7",
+    "info unsupported services.bridge.network_mode@8",
+    "warning unresolved services.variable.network_mode@9"
+  ],
+  "nodes": [
+    "service app",
+    "service none",
+    "service host",
+    "service sidecar",
+    "service missing-target",
+    "service container",
+    "service bridge",
+    "service variable",
+    "service both",
+    "network default implicit"
+  ],
+  "edges": [
+    "app -network-> default",
+    "sidecar -network_mode[shares network stack]-> app"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "app",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "none",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "none"
+        }
+      },
+      {
+        "name": "host",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "host"
+        }
+      },
+      {
+        "name": "sidecar",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "service",
+          "service": "app"
+        }
+      },
+      {
+        "name": "missing-target",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "service",
+          "service": "ghost"
+        }
+      },
+      {
+        "name": "container",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "container",
+          "container": "abc123"
+        }
+      },
+      {
+        "name": "bridge",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "other",
+          "raw": "bridge"
+        }
+      },
+      {
+        "name": "variable",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "unresolved",
+          "raw": "${MODE}"
+        }
+      },
+      {
+        "name": "both",
+        "ports": [],
+        "expose": [],
+        "networks": [],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "networkMode": {
+          "kind": "host"
+        }
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

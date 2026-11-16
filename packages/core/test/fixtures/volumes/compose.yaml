@@ -1,0 +1,33 @@
+services:
+  app:
+    image: x
+    volumes:
+      - data:/var/lib/data          # named
+      - ./src:/app:ro               # bind
+      - ../shared:/shared           # bind
+      - ~/cfg:/cfg                  # bind
+      - /abs:/abs                   # bind
+      - /cache                      # anonymous
+      - "C:\\data:/win:ro"          # bind (Windows)
+      - type: volume
+        source: data
+        target: /long
+        read_only: true
+      - type: volume
+        target: /anon-long          # anonymous
+      - type: tmpfs
+        target: /tmp
+      - type: npipe
+        source: \\.\pipe\docker_engine
+        target: \\.\pipe\docker_engine
+      - undeclared:/x               # reference error
+    tmpfs: /run
+  other:
+    image: x
+    volumes:
+      - /cache                      # anonymous: not shared with app
+      - data:/data
+volumes:
+  data:
+  backups:
+    external: true

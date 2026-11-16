@@ -16,7 +16,7 @@ import { useEffect, useMemo } from "react";
 import type { ComposeGraph, ComposeModel, GraphNode } from "@compose-lens/core";
 import { layout, NODE_SIZE } from "./layout.js";
 
-type FlowNodeData = { node: GraphNode; subtitle?: string };
+type FlowNodeData = { node: GraphNode; subtitle?: string; badge?: string };
 type FlowNode = Node<FlowNodeData>;
 
 const handles = (
@@ -34,7 +34,12 @@ function ServiceNode({ data, selected }: NodeProps<FlowNode>) {
       }`}
     >
       {handles}
-      <div className="truncate text-sm font-semibold">{data.node.label}</div>
+      <div className="flex items-center gap-1.5">
+        <span className="truncate text-sm font-semibold">{data.node.label}</span>
+        {data.badge && (
+          <span className="shrink-0 rounded bg-slate-100 px-1 text-[10px] text-slate-600">{data.badge}</span>
+        )}
+      </div>
       {data.subtitle && <div className="truncate text-xs text-slate-500">{data.subtitle}</div>}
     </div>
   );
@@ -65,11 +70,16 @@ function toFlow(graph: ComposeGraph, model: ComposeModel): { nodes: FlowNode[]; 
   const nodes = graph.nodes.map((node): FlowNode => {
     const service = node.kind === "service" ? services.get(node.label) : undefined;
     const subtitle = service?.image ?? (service?.build ? "build" : undefined);
+    const mode = service?.networkMode?.kind;
+    const badge = mode === "host" ? "host network" : mode === "none" ? "no network" : undefined;
+    const data: FlowNodeData = { node };
+    if (subtitle) data.subtitle = subtitle;
+    if (badge) data.badge = badge;
     return {
       id: node.id,
       type: node.kind,
       position: positions.get(node.id) ?? { x: 0, y: 0 },
-      data: subtitle ? { node, subtitle } : { node },
+      data,
       ...NODE_SIZE[node.kind],
     };
   });
@@ -82,6 +92,17 @@ function toFlow(graph: ComposeGraph, model: ComposeModel): { nodes: FlowNode[]; 
         label: e.optional ? `${e.label} (optional)` : e.label,
         markerEnd: { type: MarkerType.ArrowClosed, color: "#0f172a" },
         style: { stroke: "#0f172a", strokeDasharray: "6 4", opacity: e.optional ? 0.5 : 1 },
+        labelStyle: { fontSize: 11 },
+      };
+    }
+    if (e.kind === "network_mode") {
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: e.label,
+        markerEnd: { type: MarkerType.ArrowClosed, color: "#7c3aed" },
+        style: { stroke: "#7c3aed", strokeWidth: 2 },
         labelStyle: { fontSize: 11 },
       };
     }

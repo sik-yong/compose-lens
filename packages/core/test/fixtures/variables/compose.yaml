@@ -1,0 +1,22 @@
+services:
+  app:
+    image: "registry/app:${TAG:-latest}"
+    ports:
+      - "${HTTP_PORT}:80"
+      - "8080:${CONTAINER_PORT}"
+      - "$$HOME:80"                 # invalid: $$ is a literal $, not a variable
+    volumes:
+      - "${DATA_DIR}:/data"
+      - "${VOL:-${FALLBACK}}:/nested"
+    networks: ["${NET}"]
+  other:
+    image: x
+    ports:
+      - "${HTTP_PORT}:80"           # deferred, not a conflict
+  defaults:
+    image: x
+    ports:
+      - "${PORT:-8080}:80"
+      - "127.0.0.1:${PORT:-8080}:80/tcp"
+    volumes:
+      - "${SRC:-./data}:/data:ro"

@@ -1,0 +1,255 @@
+{
+  "diagnostics": [],
+  "nodes": [
+    "service short",
+    "service long",
+    "network default implicit"
+  ],
+  "edges": [
+    "short -network-> default",
+    "long -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "short",
+        "ports": [
+          {
+            "raw": "8080:80",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 8080,
+                "end": 8080
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          },
+          {
+            "raw": "80",
+            "host": {
+              "kind": "dynamic"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 1
+          },
+          {
+            "raw": "9000-9010:9000",
+            "host": {
+              "kind": "pool",
+              "ports": {
+                "start": 9000,
+                "end": 9010
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 9000,
+              "end": 9000
+            },
+            "index": 2
+          },
+          {
+            "raw": "7000-7001:7000-7001",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 7000,
+                "end": 7001
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 7000,
+              "end": 7001
+            },
+            "index": 3
+          },
+          {
+            "raw": "127.0.0.1:5432:5432",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 5432,
+                "end": 5432
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 5432,
+              "end": 5432
+            },
+            "hostIp": "127.0.0.1",
+            "index": 4
+          },
+          {
+            "raw": "[::1]:6379:6379",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 6379,
+                "end": 6379
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 6379,
+              "end": 6379
+            },
+            "hostIp": "::1",
+            "index": 5
+          },
+          {
+            "raw": "53:53/udp",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 53,
+                "end": 53
+              }
+            },
+            "protocol": "udp",
+            "container": {
+              "start": 53,
+              "end": 53
+            },
+            "index": 6
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "long",
+        "ports": [
+          {
+            "raw": "18080:80/tcp",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 18080,
+                "end": 18080
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          },
+          {
+            "raw": "80/tcp",
+            "host": {
+              "kind": "dynamic"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 1
+          },
+          {
+            "raw": "19000-19010:9000/tcp",
+            "host": {
+              "kind": "pool",
+              "ports": {
+                "start": 19000,
+                "end": 19010
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 9000,
+              "end": 9000
+            },
+            "index": 2
+          },
+          {
+            "raw": "127.0.0.1:15432:5432/tcp",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 15432,
+                "end": 15432
+              }
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 5432,
+              "end": 5432
+            },
+            "hostIp": "127.0.0.1",
+            "index": 3
+          },
+          {
+            "raw": "10053:53/udp",
+            "host": {
+              "kind": "fixed",
+              "ports": {
+                "start": 10053,
+                "end": 10053
+              }
+            },
+            "protocol": "udp",
+            "container": {
+              "start": 53,
+              "end": 53
+            },
+            "index": 4
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

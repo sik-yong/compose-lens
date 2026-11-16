@@ -1,0 +1,78 @@
+{
+  "diagnostics": [],
+  "nodes": [
+    "service list-env",
+    "service map-env",
+    "network default implicit"
+  ],
+  "edges": [
+    "list-env -network-> default",
+    "map-env -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "list-env",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [
+          "PASSWORD",
+          "EMPTY"
+        ],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "map-env",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [
+          "PASSWORD",
+          "URL"
+        ],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x",
+        "build": {
+          "argKeys": [
+            "TOKEN"
+          ],
+          "context": "."
+        }
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

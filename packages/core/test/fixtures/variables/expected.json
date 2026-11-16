@@ -1,0 +1,182 @@
+{
+  "diagnostics": [
+    "error schema services.app.ports.2@7",
+    "warning unresolved services.app.networks@11",
+    "warning unresolved services.app.volumes.0@9",
+    "warning unresolved services.app.volumes.1@10",
+    "warning unresolved services.defaults.volumes.0@22",
+    "warning unresolved services.app.ports.0@5",
+    "warning unresolved services.app.ports.1@6",
+    "warning unresolved services.other.ports.0@15",
+    "warning unresolved services.defaults.ports.0@19",
+    "warning unresolved services.defaults.ports.1@20"
+  ],
+  "nodes": [
+    "service app",
+    "service other",
+    "service defaults",
+    "network default implicit"
+  ],
+  "edges": [
+    "other -network-> default",
+    "defaults -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "app",
+        "ports": [
+          {
+            "raw": "${HTTP_PORT}:80",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          },
+          {
+            "raw": "8080:${CONTAINER_PORT}",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "index": 1
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "${NET}",
+            "implicit": false
+          }
+        ],
+        "volumes": [
+          {
+            "kind": "unresolved",
+            "source": "${DATA_DIR}",
+            "target": "/data",
+            "readOnly": false,
+            "index": 0
+          },
+          {
+            "kind": "unresolved",
+            "source": "${VOL:-${FALLBACK}}",
+            "target": "/nested",
+            "readOnly": false,
+            "index": 1
+          }
+        ],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "registry/app:${TAG:-latest}"
+      },
+      {
+        "name": "other",
+        "ports": [
+          {
+            "raw": "${HTTP_PORT}:80",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "defaults",
+        "ports": [
+          {
+            "raw": "${PORT:-8080}:80",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "index": 0
+          },
+          {
+            "raw": "127.0.0.1:${PORT:-8080}:80/tcp",
+            "host": {
+              "kind": "unresolved"
+            },
+            "protocol": "tcp",
+            "container": {
+              "start": 80,
+              "end": 80
+            },
+            "hostIp": "127.0.0.1",
+            "index": 1
+          }
+        ],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [
+          {
+            "kind": "unresolved",
+            "source": "${SRC:-./data}",
+            "target": "/data",
+            "readOnly": true,
+            "index": 0
+          }
+        ],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

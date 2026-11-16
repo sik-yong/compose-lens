@@ -1,4 +1,4 @@
-import type { ComposeModel, GraphNode, Mount, PortMapping, Service } from "@compose-lens/core";
+import type { ComposeModel, GraphNode, Mount, NetworkMode, PortMapping, Service } from "@compose-lens/core";
 import type { ReactNode } from "react";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -40,12 +40,34 @@ function port(p: PortMapping) {
 
 function mount(m: Mount) {
   const where = m.kind === "anonymous" || m.kind === "tmpfs" ? m.target : `${m.source ?? "?"} → ${m.target ?? "?"}`;
+  const kind = m.kind === "other" ? m.type : m.kind === "unresolved" ? "volume" : m.kind;
   return (
     <>
-      <span className="text-slate-500">{m.kind === "other" ? m.type : m.kind}</span> <code>{where}</code>
+      <span className="text-slate-500">{kind}</span> <code>{where}</code>
       {m.readOnly && <span className="text-slate-500"> (read-only)</span>}
+      {m.kind === "unresolved" && <Unresolved />}
     </>
   );
+}
+
+const hasVariable = (s: string) => s.replaceAll("$$", "").includes("$");
+const Unresolved = () => <span className="text-amber-700"> (contains a variable, not resolved)</span>;
+
+function networkMode(mode: NetworkMode) {
+  switch (mode.kind) {
+    case "none":
+      return "none (no network)";
+    case "host":
+      return "host (uses the host's network directly)";
+    case "service":
+      return <>shares the network stack of <strong>{mode.service}</strong></>;
+    case "container":
+      return <>shares the network stack of external container <code>{mode.container}</code></>;
+    case "other":
+      return <><code>{mode.raw}</code> (not analyzed)</>;
+    case "unresolved":
+      return <><code>{mode.raw}</code><Unresolved /></>;
+  }
 }
 
 const CONDITION: Record<string, string> = {
@@ -57,7 +79,12 @@ const CONDITION: Record<string, string> = {
 function ServiceDetails({ service }: { service: Service }) {
   return (
     <dl className="text-sm">
-      {service.image && <Row label="Image"><code>{service.image}</code></Row>}
+      {service.image && (
+        <Row label="Image">
+          <code>{service.image}</code>
+          {hasVariable(service.image) && <Unresolved />}
+        </Row>
+      )}
       {service.build && (
         <Row label="Build">
           <List
@@ -71,16 +98,19 @@ function ServiceDetails({ service }: { service: Service }) {
         </Row>
       )}
       {service.containerName && <Row label="Container">{service.containerName}</Row>}
+      {service.hostname && <Row label="Hostname">{service.hostname}</Row>}
       {service.restart && <Row label="Restart">{service.restart}</Row>}
       <Row label="Ports"><List items={service.ports.map(port)} /></Row>
+      {service.expose.length > 0 && <Row label="Expose">{service.expose.join(", ")} (container only)</Row>}
       <Row label="Networks">
         {service.networkMode ? (
-          <>network_mode <code>{service.networkMode}</code></>
+          networkMode(service.networkMode)
         ) : (
           <List items={service.networks.map((n) => (n.implicit ? `${n.name} (implicit)` : n.name))} />
         )}
       </Row>
       <Row label="Volumes"><List items={service.volumes.map(mount)} /></Row>
+      {service.tmpfs.length > 0 && <Row label="tmpfs"><List items={service.tmpfs.map((t) => <code>{t}</code>)} /></Row>}
       <Row label="Depends on">
         <List
           items={service.dependsOn.map((d) => (
@@ -102,6 +132,16 @@ function ServiceDetails({ service }: { service: Service }) {
           </>
         )}
       </Row>
+      {service.envFiles.length > 0 && (
+        <Row label="env_file">
+          <List items={service.envFiles.map((f) => <code>{f}</code>)} />
+          <div className="text-xs text-slate-500">Files are not read.</div>
+        </Row>
+      )}
+      {service.secrets.length > 0 && <Row label="Secrets">{service.secrets.join(", ")}</Row>}
+      {service.configs.length > 0 && <Row label="Configs">{service.configs.join(", ")}</Row>}
+      {service.profiles.length > 0 && <Row label="Profiles">{service.profiles.join(", ")} (not evaluated)</Row>}
+      {service.hasHealthcheck && <Row label="Healthcheck">defined</Row>}
     </dl>
   );
 }

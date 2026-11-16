@@ -1,11 +1,15 @@
-import type { Diagnostic, DiagnosticLocation, DocumentPath } from "./diagnostics.js";
+import type { Diagnostic, DocumentPath } from "./diagnostics.js";
 import { LIMITS } from "./limits.js";
+import { checkModel } from "./checks.js";
+import { Context, hasVariable, type Locate } from "./context.js";
+import { SERVICE_INCOMPLETE, SERVICE_KNOWN, TOP_LEVEL_INCOMPLETE, TOP_LEVEL_KNOWN, isExtension } from "./fields.js";
 import type {
   BuildInfo,
   ComposeModel,
   Dependency,
   DependencyCondition,
   Mount,
+  NetworkMode,
   PortMapping,
   PortRange,
   ResourceDef,
@@ -13,23 +17,12 @@ import type {
   ServiceNetwork,
 } from "./model.js";
 
-type Locate = (path: DocumentPath) => DiagnosticLocation;
 type Obj = Record<string, unknown>;
 
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
-/** True if the value contains Compose interpolation (`$$` is a literal `$`). */
-const hasVariable = (s: string) => s.replaceAll("$$", "").includes("$");
 const str = (v: unknown): string | undefined =>
   typeof v === "string" ? v : typeof v === "number" ? String(v) : undefined;
 
-class Context {
-  readonly diagnostics: Diagnostic[] = [];
-  constructor(readonly locate: Locate) {}
-
-  schema(path: DocumentPath, message: string) {
-    this.diagnostics.push({ code: "schema", severity: "error", message, location: this.locate(path) });
-  }
-}
 
 // ---------- ports ----------
 
@@ -60,28 +53,62 @@ function hostBinding(host: string | undefined, container: PortRange | undefined)
 }
 
 function makePort(
+
   raw: string,
   hostText: string | undefined,
   containerText: string,
   protocol: string,
   hostIp: string | undefined,
-): PortMapping | undefined {
+): Omit<PortMapping, "index"> | undefined {
   const containerHasVariable = hasVariable(containerText);
   const container = containerHasVariable ? undefined : parseRange(containerText);
   if (!container && !containerHasVariable) return undefined;
   const host = hostBinding(hostText, container);
   if (!host) return undefined;
-  const mapping: PortMapping = { raw, host, protocol };
+  const mapping: Omit<PortMapping, "index"> = { raw, host, protocol };
   if (container) mapping.container = container;
   if (hostIp) mapping.hostIp = hostIp;
   return mapping;
 }
 
-function parseShortPort(raw: string): PortMapping | undefined {
+/**
+ * Positions of `char` outside `${...}` expressions, so separators inside a
+ * variable default (e.g. `${PORT:-8080}`) are not treated as separators.
+ */
+function separators(text: string, char: string): number[] {
+  const found: number[] = [];
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text.startsWith("$$", i)) {
+      i++;
+    } else if (text.startsWith("${", i)) {
+      depth++;
+      i++;
+    } else if (text[i] === "}" && depth > 0) {
+      depth--;
+    } else if (text[i] === char && depth === 0) {
+      found.push(i);
+    }
+  }
+  return found;
+}
+
+function splitAt(text: string, positions: number[]): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  for (const p of positions) {
+    parts.push(text.slice(start, p));
+    start = p + 1;
+  }
+  parts.push(text.slice(start)); // keep a trailing empty part so it can be rejected
+  return parts;
+}
+
+function parseShortPort(raw: string): Omit<PortMapping, "index"> | undefined {
   let rest = raw;
   let protocol = "tcp";
-  const slash = rest.lastIndexOf("/");
-  if (slash >= 0) {
+  const slash = separators(rest, "/").at(-1);
+  if (slash !== undefined) {
     protocol = rest.slice(slash + 1);
     rest = rest.slice(0, slash);
   }
@@ -92,14 +119,14 @@ function parseShortPort(raw: string): PortMapping | undefined {
     hostIp = rest.slice(1, close);
     rest = rest.slice(close + 2);
   }
-  const parts = rest.split(":");
+  const parts = splitAt(rest, separators(rest, ":"));
   const containerText = parts.pop() ?? "";
   const hostText = parts.length > 0 ? parts.pop() : undefined;
   if (hostIp === undefined && parts.length > 0) hostIp = parts.join(":");
   return makePort(raw, hostText, containerText, protocol, hostIp);
 }
 
-function parseLongPort(entry: Obj): PortMapping | undefined {
+function parseLongPort(entry: Obj): Omit<PortMapping, "index"> | undefined {
   const target = str(entry["target"]);
   if (target === undefined) return undefined;
   const published = str(entry["published"]);
@@ -119,7 +146,7 @@ function normalizePorts(ctx: Context, value: unknown, path: DocumentPath): PortM
   value.forEach((entry, i) => {
     const text = str(entry);
     const mapping = text !== undefined ? parseShortPort(text) : isObj(entry) ? parseLongPort(entry) : undefined;
-    if (mapping) result.push(mapping);
+    if (mapping) result.push({ ...mapping, index: i });
     else ctx.schema([...path, i], "Invalid port mapping.");
   });
   return result;
@@ -135,22 +162,23 @@ function classifySource(source: string): Mount["kind"] {
   return /^(\/|\.\/|\.\.\/|~|\.$|\.\.$)/.test(source) ? "bind" : "named";
 }
 
-/** Splits on ":" but keeps a Windows drive prefix (C:\ or C:/) inside the part. */
+/**
+ * Splits on ":" outside `${...}`, keeping a Windows drive prefix (C:\ or C:/)
+ * at the start of a part.
+ */
 function splitMountSpec(raw: string): string[] {
-  const parts: string[] = [];
-  let rest = raw;
-  for (;;) {
-    const skip = WINDOWS_PATH.test(rest) ? 2 : 0;
-    const colon = rest.indexOf(":", skip);
-    if (colon < 0) break;
-    parts.push(rest.slice(0, colon));
-    rest = rest.slice(colon + 1);
+  const colons = separators(raw, ":");
+  const kept: number[] = [];
+  let partStart = 0;
+  for (const c of colons) {
+    if (c === partStart + 1 && WINDOWS_PATH.test(raw.slice(partStart))) continue;
+    kept.push(c);
+    partStart = c + 1;
   }
-  parts.push(rest); // keep a trailing empty part ("name:") so it can be rejected
-  return parts;
+  return splitAt(raw, kept);
 }
 
-function parseShortMount(raw: string): Mount | undefined {
+function parseShortMount(raw: string): Omit<Mount, "index"> | undefined {
   const parts = splitMountSpec(raw);
   if (parts.length === 1) return raw === "" ? undefined : { kind: "anonymous", target: raw, readOnly: false };
   const [source = "", target = "", mode = ""] = parts;
@@ -158,7 +186,7 @@ function parseShortMount(raw: string): Mount | undefined {
   return { kind: classifySource(source), source, target, readOnly: mode.split(",").includes("ro") };
 }
 
-function parseLongMount(entry: Obj): Mount | undefined {
+function parseLongMount(entry: Obj): Omit<Mount, "index"> | undefined {
   const type = str(entry["type"]);
   const source = str(entry["source"]);
   const target = str(entry["target"]);
@@ -169,7 +197,7 @@ function parseLongMount(entry: Obj): Mount | undefined {
   else if (type === "tmpfs") kind = "tmpfs";
   else if (type === undefined) return undefined;
   else kind = "other";
-  const mount: Mount = { kind, readOnly };
+  const mount: Omit<Mount, "index"> = { kind, readOnly };
   if (source) mount.source = source;
   if (target) mount.target = target;
   if (kind === "other") mount.type = type;
@@ -186,7 +214,7 @@ function normalizeVolumes(ctx: Context, value: unknown, path: DocumentPath): Mou
   value.forEach((entry, i) => {
     const mount =
       typeof entry === "string" ? parseShortMount(entry) : isObj(entry) ? parseLongMount(entry) : undefined;
-    if (mount) result.push(mount);
+    if (mount) result.push({ ...mount, index: i });
     else ctx.schema([...path, i], "Invalid volume mount.");
   });
   return result;
@@ -311,30 +339,107 @@ function normalizeBuild(ctx: Context, value: unknown, path: DocumentPath): Build
   return build;
 }
 
+function parseNetworkMode(raw: string): NetworkMode {
+  if (hasVariable(raw)) return { kind: "unresolved", raw };
+  if (raw === "none" || raw === "host") return { kind: raw };
+  if (raw.startsWith("service:")) return { kind: "service", service: raw.slice("service:".length) };
+  if (raw.startsWith("container:")) return { kind: "container", container: raw.slice("container:".length) };
+  return { kind: "other", raw };
+}
+
+/** A string, or a list of strings/numbers. Returns the entries as strings. */
+function stringList(ctx: Context, value: unknown, path: DocumentPath, field: string, allowString = false): string[] {
+  if (value === undefined || value === null) return [];
+  if (allowString && typeof value === "string") return [value];
+  if (Array.isArray(value)) {
+    const items = value.map(str);
+    if (items.every((i): i is string => i !== undefined)) return items;
+  }
+  ctx.schema(path, `\`${field}\` must be a list${allowString ? " or a string" : ""}.`);
+  return [];
+}
+
+/** Names from a list of names or `{ source: name, … }` entries (service secrets/configs). */
+function sourceNames(ctx: Context, value: unknown, path: DocumentPath, field: string): string[] {
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value)) {
+    const names = value.map((entry) => (isObj(entry) ? str(entry["source"]) : str(entry)));
+    if (names.every((n): n is string => n !== undefined)) return names;
+  }
+  ctx.schema(path, `\`${field}\` must be a list of names or mappings with \`source\`.`);
+  return [];
+}
+
+/** env_file: a path, or a list of paths or `{ path, required }`. Paths only; files are never read. */
+function envFilePaths(ctx: Context, value: unknown, path: DocumentPath): string[] {
+  if (value === undefined || value === null) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) {
+    const paths = value.map((entry) => (isObj(entry) ? str(entry["path"]) : str(entry)));
+    if (paths.every((p): p is string => p !== undefined)) return paths;
+  }
+  ctx.schema(path, "`env_file` must be a path or a list of paths.");
+  return [];
+}
+
+function reportUnsupportedServiceKeys(ctx: Context, def: Obj, path: DocumentPath) {
+  const keys = Object.keys(def).filter((k) => !isExtension(k));
+  for (const key of keys.filter((k) => SERVICE_INCOMPLETE.has(k))) {
+    ctx.report("unsupported", "warning", [...path, key], `\`${key}\` is not supported. The result may be incomplete.`);
+  }
+  const noted = keys.filter((k) => !SERVICE_KNOWN.has(k) && !SERVICE_INCOMPLETE.has(k));
+  if (noted.length > 0) {
+    ctx.report("unsupported", "info", path, `Not analyzed: ${noted.map((k) => `\`${k}\``).join(", ")}.`);
+  }
+}
+
 function normalizeService(ctx: Context, name: string, value: unknown): Service {
   const path = ["services", name];
   const def: Obj = isObj(value) ? value : {};
   if (!isObj(value) && value !== null) ctx.schema(path, "A service must be a mapping.");
+  reportUnsupportedServiceKeys(ctx, def, path);
 
-  const networkMode = str(def["network_mode"]);
+  const networkModeRaw = str(def["network_mode"]);
   const service: Service = {
     name,
     ports: normalizePorts(ctx, def["ports"], [...path, "ports"]),
-    networks: normalizeServiceNetworks(ctx, def["networks"], networkMode, [...path, "networks"]),
+    expose: stringList(ctx, def["expose"], [...path, "expose"], "expose"),
+    networks: normalizeServiceNetworks(ctx, def["networks"], networkModeRaw, [...path, "networks"]),
     volumes: normalizeVolumes(ctx, def["volumes"], [...path, "volumes"]),
+    tmpfs: stringList(ctx, def["tmpfs"], [...path, "tmpfs"], "tmpfs", true),
     dependsOn: normalizeDependsOn(ctx, def["depends_on"], [...path, "depends_on"]),
     environmentKeys: keysOf(ctx, def["environment"], [...path, "environment"], "environment"),
+    envFiles: envFilePaths(ctx, def["env_file"], [...path, "env_file"]),
+    secrets: sourceNames(ctx, def["secrets"], [...path, "secrets"], "secrets"),
+    configs: sourceNames(ctx, def["configs"], [...path, "configs"], "configs"),
+    profiles: stringList(ctx, def["profiles"], [...path, "profiles"], "profiles"),
+    hasHealthcheck: isObj(def["healthcheck"]) && def["healthcheck"]["disable"] !== true,
   };
   const image = str(def["image"]);
   const build = normalizeBuild(ctx, def["build"], [...path, "build"]);
   const containerName = str(def["container_name"]);
+  const hostname = str(def["hostname"]);
   const restart = str(def["restart"]);
   if (image !== undefined) service.image = image;
   if (build) service.build = build;
   if (containerName !== undefined) service.containerName = containerName;
+  if (hostname !== undefined) service.hostname = hostname;
   if (restart !== undefined) service.restart = restart;
-  if (networkMode !== undefined) service.networkMode = networkMode;
+  if (networkModeRaw !== undefined) service.networkMode = parseNetworkMode(networkModeRaw);
   return service;
+}
+
+function reportTopLevelKeys(ctx: Context, root: Obj) {
+  for (const key of Object.keys(root)) {
+    if (TOP_LEVEL_KNOWN.has(key) || isExtension(key)) continue;
+    if (key === "version") {
+      ctx.report("unsupported", "info", [key], "`version` is obsolete in the Compose Specification and is ignored.");
+    } else if (TOP_LEVEL_INCOMPLETE.has(key)) {
+      ctx.report("unsupported", "warning", [key], `\`${key}\` is not supported. The result may be incomplete.`);
+    } else {
+      ctx.report("unsupported", "info", [key], `Top-level \`${key}\` is not analyzed.`);
+    }
+  }
 }
 
 function normalizeResources(ctx: Context, value: unknown, field: "networks" | "volumes"): ResourceDef[] {
@@ -348,34 +453,6 @@ function normalizeResources(ctx: Context, value: unknown, field: "networks" | "v
     external: isObj(def) && def["external"] === true,
     implicit: false,
   }));
-}
-
-// ---------- references ----------
-
-function checkReferences(ctx: Context, model: ComposeModel) {
-  const services = new Set(model.services.map((s) => s.name));
-  const networks = new Set(model.networks.map((n) => n.name));
-  const volumes = new Set(model.volumes.map((v) => v.name));
-  const reference = (path: DocumentPath, message: string) =>
-    ctx.diagnostics.push({ code: "reference", severity: "error", message, location: ctx.locate(path) });
-
-  for (const s of model.services) {
-    for (const dep of s.dependsOn) {
-      if (!services.has(dep.service)) {
-        reference(["services", s.name, "depends_on"], `\`${s.name}\` depends on an undefined service \`${dep.service}\`.`);
-      }
-    }
-    for (const n of s.networks) {
-      if (!n.implicit && n.name !== "default" && !networks.has(n.name) && !hasVariable(n.name)) {
-        reference(["services", s.name, "networks"], `\`${s.name}\` uses an undeclared network \`${n.name}\`.`);
-      }
-    }
-    for (const m of s.volumes) {
-      if (m.kind === "named" && m.source && !volumes.has(m.source)) {
-        reference(["services", s.name, "volumes"], `\`${s.name}\` uses an undeclared volume \`${m.source}\`.`);
-      }
-    }
-  }
 }
 
 /** Turns the parsed YAML value into a ComposeModel, collecting diagnostics. */
@@ -404,6 +481,7 @@ export function normalize(
     return { diagnostics: ctx.diagnostics };
   }
 
+  reportTopLevelKeys(ctx, value);
   const model: ComposeModel = {
     services: serviceNames.map((name) => normalizeService(ctx, name, services[name])),
     networks: normalizeResources(ctx, value["networks"], "networks"),
@@ -418,6 +496,6 @@ export function normalize(
     model.networks.unshift({ name: "default", external: false, implicit: true });
   }
 
-  checkReferences(ctx, model);
+  checkModel(ctx, model);
   return { model, diagnostics: ctx.diagnostics };
 }

@@ -1,0 +1,44 @@
+{
+  "diagnostics": [
+    "error reference services.web.depends_on@4",
+    "error reference services.web.networks@5"
+  ],
+  "nodes": [
+    "service web"
+  ],
+  "edges": [],
+  "model": {
+    "services": [
+      {
+        "name": "web",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "missing",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "db",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [],
+    "volumes": []
+  }
+}

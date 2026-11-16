@@ -48,7 +48,7 @@ describe("analyze: networks", () => {
   it("does not join default when network_mode is set", () => {
     const r = analyze("services:\n  a: {image: x, network_mode: host}\n");
     expect(r.graph!.edges).toEqual([]);
-    expect(r.model!.services[0]!.networkMode).toBe("host");
+    expect(r.model!.services[0]!.networkMode).toEqual({ kind: "host" });
   });
 
   it("rejects networks together with network_mode", () => {

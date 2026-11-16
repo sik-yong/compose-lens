@@ -1,0 +1,205 @@
+{
+  "diagnostics": [
+    "error schema services.broken.depends_on.db.condition@23",
+    "error reference services.broken.depends_on@22"
+  ],
+  "nodes": [
+    "service db",
+    "service cache",
+    "service migrate",
+    "service short",
+    "service long",
+    "service broken",
+    "network default implicit"
+  ],
+  "edges": [
+    "db -network-> default",
+    "cache -network-> default",
+    "migrate -network-> default",
+    "short -depends_on[starts after]-> db",
+    "short -depends_on[starts after]-> cache",
+    "short -network-> default",
+    "long -depends_on[after healthy]-> db",
+    "long -depends_on[after successful completion]-> migrate",
+    "long -depends_on[starts after]?-> cache",
+    "long -network-> default",
+    "broken -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "db",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "cache",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "migrate",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "short",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "db",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          },
+          {
+            "service": "cache",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "long",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "db",
+            "condition": "service_healthy",
+            "required": true,
+            "restart": true
+          },
+          {
+            "service": "migrate",
+            "condition": "service_completed_successfully",
+            "required": true,
+            "restart": false
+          },
+          {
+            "service": "cache",
+            "condition": "service_started",
+            "required": false,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "broken",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "ghost",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

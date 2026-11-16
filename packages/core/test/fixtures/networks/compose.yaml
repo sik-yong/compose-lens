@@ -1,0 +1,15 @@
+services:
+  omitted: {image: x}
+  empty-list: {image: x, networks: []}
+  empty-map: {image: x, networks: {}}
+  explicit: {image: x, networks: [front, default]}
+  aliased:
+    image: x
+    networks:
+      front:
+        aliases: [api]
+  missing: {image: x, networks: [nope]}
+networks:
+  front:
+  shared:
+    external: true

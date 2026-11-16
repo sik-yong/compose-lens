@@ -3,7 +3,7 @@ import { LIMITS } from "./limits.js";
 import type { ComposeModel, DependencyCondition } from "./model.js";
 
 export type GraphNodeKind = "service" | "network" | "volume";
-export type GraphEdgeKind = "depends_on" | "network" | "volume";
+export type GraphEdgeKind = "depends_on" | "network" | "volume" | "network_mode";
 
 export interface GraphNode {
   /** Internal id (svc_1, net_1, vol_1). Never derived from input text. */
@@ -18,7 +18,7 @@ export interface GraphNode {
 export interface GraphEdge {
   id: string;
   kind: GraphEdgeKind;
-  /** depends_on: dependent service. network/volume: service. */
+  /** depends_on / network_mode: the dependent service. network/volume: the service. */
   source: string;
   /** depends_on: dependency. network/volume: the resource. */
   target: string;
@@ -70,6 +70,10 @@ export function toGraph(model: ComposeModel): { graph?: ComposeGraph; diagnostic
       if (target) {
         add({ kind: "depends_on", source, target, label: CONDITION_LABELS[dep.condition], optional: !dep.required });
       }
+    }
+    if (s.networkMode?.kind === "service") {
+      const target = serviceIds.get(s.networkMode.service);
+      if (target) add({ kind: "network_mode", source, target, label: "shares network stack", optional: false });
     }
     for (const n of s.networks) {
       const target = networkIds.get(n.name);

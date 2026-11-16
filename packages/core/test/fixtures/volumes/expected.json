@@ -1,0 +1,184 @@
+{
+  "diagnostics": [
+    "info unsupported services.app.volumes.10@20",
+    "error reference services.app.volumes.11@23",
+    "info unverifiable volumes.backups@33"
+  ],
+  "nodes": [
+    "service app",
+    "service other",
+    "network default implicit",
+    "volume data",
+    "volume backups external"
+  ],
+  "edges": [
+    "app -network-> default",
+    "app -volume-> data",
+    "other -network-> default",
+    "other -volume-> data"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "app",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [
+          {
+            "kind": "named",
+            "source": "data",
+            "target": "/var/lib/data",
+            "readOnly": false,
+            "index": 0
+          },
+          {
+            "kind": "bind",
+            "source": "./src",
+            "target": "/app",
+            "readOnly": true,
+            "index": 1
+          },
+          {
+            "kind": "bind",
+            "source": "../shared",
+            "target": "/shared",
+            "readOnly": false,
+            "index": 2
+          },
+          {
+            "kind": "bind",
+            "source": "~/cfg",
+            "target": "/cfg",
+            "readOnly": false,
+            "index": 3
+          },
+          {
+            "kind": "bind",
+            "source": "/abs",
+            "target": "/abs",
+            "readOnly": false,
+            "index": 4
+          },
+          {
+            "kind": "anonymous",
+            "target": "/cache",
+            "readOnly": false,
+            "index": 5
+          },
+          {
+            "kind": "bind",
+            "source": "C:\\data",
+            "target": "/win",
+            "readOnly": true,
+            "index": 6
+          },
+          {
+            "kind": "named",
+            "readOnly": true,
+            "source": "data",
+            "target": "/long",
+            "index": 7
+          },
+          {
+            "kind": "anonymous",
+            "readOnly": false,
+            "target": "/anon-long",
+            "index": 8
+          },
+          {
+            "kind": "tmpfs",
+            "readOnly": false,
+            "target": "/tmp",
+            "index": 9
+          },
+          {
+            "kind": "other",
+            "readOnly": false,
+            "source": "\\\\.\\pipe\\docker_engine",
+            "target": "\\\\.\\pipe\\docker_engine",
+            "type": "npipe",
+            "index": 10
+          },
+          {
+            "kind": "named",
+            "source": "undeclared",
+            "target": "/x",
+            "readOnly": false,
+            "index": 11
+          }
+        ],
+        "tmpfs": [
+          "/run"
+        ],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "other",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [
+          {
+            "kind": "anonymous",
+            "target": "/cache",
+            "readOnly": false,
+            "index": 0
+          },
+          {
+            "kind": "named",
+            "source": "data",
+            "target": "/data",
+            "readOnly": false,
+            "index": 1
+          }
+        ],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": [
+      {
+        "name": "data",
+        "external": false,
+        "implicit": false
+      },
+      {
+        "name": "backups",
+        "external": true,
+        "implicit": false
+      }
+    ]
+  }
+}

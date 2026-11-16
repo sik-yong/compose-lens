@@ -1,0 +1,15 @@
+x-base: &base
+  image: x
+  networks: [back]
+  depends_on: [db]
+services:
+  db:
+    image: postgres
+    networks: [back]
+  a:
+    <<: *base
+  b:
+    <<: *base
+    image: y
+networks:
+  back:

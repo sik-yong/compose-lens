@@ -1,0 +1,10 @@
+services:
+  app:
+    image: x
+    environment:
+      PASSWORD: S3CRET-1
+      - ignored
+    build:
+      context: .
+      args:
+        TOKEN: S3CRET-2

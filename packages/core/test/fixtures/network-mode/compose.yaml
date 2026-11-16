@@ -1,0 +1,10 @@
+services:
+  app: {image: x}
+  none: {image: x, network_mode: none}
+  host: {image: x, network_mode: host}
+  sidecar: {image: x, network_mode: "service:app"}
+  missing-target: {image: x, network_mode: "service:ghost"}
+  container: {image: x, network_mode: "container:abc123"}
+  bridge: {image: x, network_mode: bridge}
+  variable: {image: x, network_mode: "${MODE}"}
+  both: {image: x, network_mode: host, networks: []}

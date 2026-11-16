@@ -27,7 +27,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 | `volumes` | Analyzed | `external`, `name`, `driver` shown. External volumes are marked "existence not verified". `driver_opts`, `labels`: Noted |
 | `name` | Shown | Project name |
 | `version` | Noted | Obsolete in the spec. Info diagnostic only |
-| `secrets`, `configs` | Shown (names only) | Contents and files are never read |
+| `secrets`, `configs` | Accepted | Not displayed. Services' references to them are shown by name. Contents and files are never read |
 | `include` | Noted | Warning: the result may be incomplete |
 | `x-*` | Ignored | Extension fields are valid. Anchors defined here are resolved normally |
 | any other key | Noted | Unknown top-level key |
@@ -67,6 +67,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 - `network_mode: none` means no network. `host` shows a "host network" badge with no network edges.
 - `network_mode: service:<name>` draws a "shares network stack" edge. A missing target is a `reference` error.
 - `network_mode: container:<id>` is shown as an external container (`unverifiable`).
+- Other values (for example `bridge`) are Noted. Values containing a variable are `unresolved`.
 - Using `networks` and `network_mode` together is a `schema` error.
 - Sharing a network means "on the same network in this configuration". It does not mean the services talk to each other.
 
@@ -87,8 +88,8 @@ This document is the source of truth for what Compose Lens understands. If the a
 | dynamic | `"80"` | The host port is **assigned at random**. It is not host port 80 |
 | pool | `"8000-8010:80"`, or `published: "8000-8010"` with a single `target` | **One** free port from the range is assigned. The whole range is not occupied |
 
-- **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP counts as all interfaces.
-- Excluded from conflict checks: dynamic and pool bindings, and ports containing variables. A note for a pool overlapping a fixed binding is *(v0.1.1+)*.
+- **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP, `0.0.0.0`, or `::` counts as all interfaces and overlaps any IP. Other IPs overlap only when they are equal.
+- Excluded from conflict checks: dynamic and pool bindings, and ports containing a variable on either side (reported as `unresolved`). A note for a pool overlapping a fixed binding is *(v0.1.1+)*.
 - Conflicts are reported as "may conflict within this file". Actual host usage is not checked. Profiles are not evaluated.
 
 ### Volumes
@@ -106,6 +107,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 - **Not resolved in v0.1.** `.env` and environment variables are not read.
 - Detected forms: `${VAR}`, `${VAR:-d}`, `${VAR-d}`, `${VAR:?e}`, `${VAR?e}`, `${VAR:+a}`, `${VAR+a}`, `$VAR`, and nested expressions such as `${A:-${B}}`. `$$` is a literal `$`, so `$$VAR` is not a variable.
 - Values keep their original expression and are marked *unresolved*, even when a default exists.
+- Separators inside an expression are not treated as separators: `${PORT:-8080}:80` is one host part and one container part.
 - Checks that depend on an unresolved value are **deferred** with an `unresolved` diagnostic. They are reported neither as errors nor as OK.
 
 ### YAML

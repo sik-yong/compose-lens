@@ -1,0 +1,177 @@
+{
+  "diagnostics": [
+    "error reference services.missing.networks@11",
+    "info unverifiable networks.shared@15"
+  ],
+  "nodes": [
+    "service omitted",
+    "service empty-list",
+    "service empty-map",
+    "service explicit",
+    "service aliased",
+    "service missing",
+    "network default implicit",
+    "network front",
+    "network shared external"
+  ],
+  "edges": [
+    "omitted -network-> default",
+    "empty-list -network-> default",
+    "empty-map -network-> default",
+    "explicit -network-> front",
+    "explicit -network-> default",
+    "aliased -network-> front"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "omitted",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "empty-list",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "empty-map",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "explicit",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "front",
+            "implicit": false
+          },
+          {
+            "name": "default",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "aliased",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "front",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "missing",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "nope",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      },
+      {
+        "name": "front",
+        "external": false,
+        "implicit": false
+      },
+      {
+        "name": "shared",
+        "external": true,
+        "implicit": false
+      }
+    ],
+    "volumes": []
+  }
+}

@@ -1,0 +1,35 @@
+version: "3.9"
+include:
+  - other.yaml
+x-common: &common
+  image: x
+  restart: unless-stopped
+secrets:
+  token:
+    file: ./token.txt
+services:
+  app:
+    <<: *common
+    extends:
+      file: base.yaml
+      service: base
+    deploy:
+      replicas: 2
+    links: [db]
+    x-note: ignored
+    command: ["run", "--token", "S3CRET-not-displayed"]
+    labels:
+      com.example: S3CRET-label
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://user:S3CRET@localhost"]
+    secrets: [token]
+    profiles: [debug]
+    env_file:
+      - .env
+      - path: ./local.env
+        required: false
+  db:
+    image: postgres
+    expose: ["5432"]
+    hostname: database
+whatever: true

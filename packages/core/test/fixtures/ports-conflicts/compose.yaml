@@ -1,0 +1,26 @@
+services:
+  a:
+    image: x
+    ports:
+      - "8080:80"
+      - "53:53/udp"
+      - "127.0.0.1:5432:5432"
+      - "9000-9010:9000"   # pool: never a conflict
+      - "3000"             # dynamic: never a conflict
+  b:
+    image: x
+    ports:
+      - "8080:8080"        # conflict: same host port, both on all interfaces
+      - "53:53/tcp"        # no conflict: different protocol
+      - "127.0.0.2:5432:5432" # no conflict: different host IP
+      - "9005:9005"        # no conflict with a's pool
+  c:
+    image: x
+    ports:
+      - "0.0.0.0:5432:5432" # conflict with a: wildcard overlaps 127.0.0.1
+      - "8079-8081:8079-8081" # conflict: range overlaps 8080
+  d:
+    image: x
+    ports:
+      - "4000:4000"
+      - "4000:4001"        # conflict within one service

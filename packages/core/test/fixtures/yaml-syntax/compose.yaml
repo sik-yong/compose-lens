@@ -1,0 +1,4 @@
+services:
+  web:
+    image: x
+     ports: ["80:80"]

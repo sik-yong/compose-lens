@@ -1,0 +1,26 @@
+# Short and long syntax for the same mappings, and every host binding kind.
+services:
+  short:
+    image: x
+    ports:
+      - "8080:80"            # fixed
+      - "80"                 # dynamic
+      - "9000-9010:9000"     # pool: one free port from the range
+      - "7000-7001:7000-7001" # fixed range
+      - "127.0.0.1:5432:5432"
+      - "[::1]:6379:6379"
+      - "53:53/udp"
+  long:
+    image: x
+    ports:
+      - target: 80
+        published: "18080"
+      - target: 80
+      - target: 9000
+        published: "19000-19010"
+      - target: 5432
+        published: "15432"
+        host_ip: 127.0.0.1
+      - target: 53
+        published: "10053"
+        protocol: udp

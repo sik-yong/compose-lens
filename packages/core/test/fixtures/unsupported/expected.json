@@ -1,0 +1,84 @@
+{
+  "diagnostics": [
+    "info unsupported version@1",
+    "warning unsupported include@3",
+    "info unsupported whatever@35",
+    "warning unsupported services.app.extends@14",
+    "info unsupported services.app@12",
+    "info unsupported services.app.profiles@26"
+  ],
+  "nodes": [
+    "service app",
+    "service db",
+    "network default implicit"
+  ],
+  "edges": [
+    "app -network-> default",
+    "db -network-> default"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "app",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [
+          ".env",
+          "./local.env"
+        ],
+        "secrets": [
+          "token"
+        ],
+        "configs": [],
+        "profiles": [
+          "debug"
+        ],
+        "hasHealthcheck": true,
+        "image": "x",
+        "restart": "unless-stopped"
+      },
+      {
+        "name": "db",
+        "ports": [],
+        "expose": [
+          "5432"
+        ],
+        "networks": [
+          {
+            "name": "default",
+            "implicit": true
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "postgres",
+        "hostname": "database"
+      }
+    ],
+    "networks": [
+      {
+        "name": "default",
+        "external": false,
+        "implicit": true
+      }
+    ],
+    "volumes": []
+  }
+}

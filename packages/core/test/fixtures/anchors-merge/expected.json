@@ -1,0 +1,105 @@
+{
+  "diagnostics": [],
+  "nodes": [
+    "service db",
+    "service a",
+    "service b",
+    "network back"
+  ],
+  "edges": [
+    "db -network-> back",
+    "a -depends_on[starts after]-> db",
+    "a -network-> back",
+    "b -depends_on[starts after]-> db",
+    "b -network-> back"
+  ],
+  "model": {
+    "services": [
+      {
+        "name": "db",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "back",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "postgres"
+      },
+      {
+        "name": "a",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "back",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "db",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "x"
+      },
+      {
+        "name": "b",
+        "ports": [],
+        "expose": [],
+        "networks": [
+          {
+            "name": "back",
+            "implicit": false
+          }
+        ],
+        "volumes": [],
+        "tmpfs": [],
+        "dependsOn": [
+          {
+            "service": "db",
+            "condition": "service_started",
+            "required": true,
+            "restart": false
+          }
+        ],
+        "environmentKeys": [],
+        "envFiles": [],
+        "secrets": [],
+        "configs": [],
+        "profiles": [],
+        "hasHealthcheck": false,
+        "image": "y"
+      }
+    ],
+    "networks": [
+      {
+        "name": "back",
+        "external": false,
+        "implicit": false
+      }
+    ],
+    "volumes": []
+  }
+}

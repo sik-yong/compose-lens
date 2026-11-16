@@ -1,0 +1,15 @@
+services:
+  list-env:
+    image: x
+    environment:
+      - PASSWORD=S3CRET-1
+      - EMPTY
+  map-env:
+    image: x
+    environment:
+      PASSWORD: S3CRET-2
+      URL: "postgres://u:S3CRET-3@db/x"
+    build:
+      context: .
+      args:
+        - TOKEN=S3CRET-4
