@@ -30,6 +30,10 @@ export interface PortMapping {
   /** Undefined when it contains a variable. */
   container?: PortRange;
   protocol: Protocol;
+  /** Long syntax only: `name`, `app_protocol`, `mode` as written. */
+  name?: string;
+  appProtocol?: string;
+  mode?: string;
 }
 
 export type MountKind = "named" | "bind" | "anonymous" | "tmpfs" | "other" | "unresolved";
@@ -38,7 +42,7 @@ export interface Mount {
   /** Position in the service's `volumes` list. */
   index: number;
   kind: MountKind;
-  /** Volume name (named) or host path (bind). */
+  /** Volume name (named) or host path (bind). URL credentials are redacted. */
   source?: string;
   target?: string;
   readOnly: boolean;
@@ -62,9 +66,14 @@ export interface ServiceNetwork {
   name: string;
   /** True when joined through the implicit default network rule. */
   implicit: boolean;
+  /** Mapping syntax only, as written. */
+  aliases?: string[];
+  ipv4Address?: string;
+  ipv6Address?: string;
 }
 
 export interface BuildInfo {
+  /** URL credentials are redacted. */
   context?: string;
   dockerfile?: string;
   target?: string;
@@ -83,6 +92,7 @@ export type NetworkMode =
 
 export interface Service {
   name: string;
+  /** URL credentials are redacted. */
   image?: string;
   build?: BuildInfo;
   containerName?: string;
@@ -99,7 +109,7 @@ export interface Service {
   dependsOn: Dependency[];
   /** environment keys only. Values are never stored. */
   environmentKeys: string[];
-  /** `env_file` paths. The files are never read. */
+  /** `env_file` paths. The files are never read. URL credentials are redacted. */
   envFiles: string[];
   /** Names only. */
   secrets: string[];
@@ -123,4 +133,7 @@ export interface ComposeModel {
   services: Service[];
   networks: ResourceDef[];
   volumes: ResourceDef[];
+  /** Top-level secrets and configs: names and `external` only. Contents are never read. */
+  secrets: ResourceDef[];
+  configs: ResourceDef[];
 }

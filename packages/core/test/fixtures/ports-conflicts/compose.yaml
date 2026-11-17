@@ -5,7 +5,7 @@ services:
       - "8080:80"
       - "53:53/udp"
       - "127.0.0.1:5432:5432"
-      - "9000-9010:9000"   # pool: never a conflict
+      - "9000-9010:9000"   # pool: overlaps b's 9005, info note only (depends on start order)
       - "3000"             # dynamic: never a conflict
   b:
     image: x
@@ -13,7 +13,7 @@ services:
       - "8080:8080"        # conflict: same host port, both on all interfaces
       - "53:53/tcp"        # no conflict: different protocol
       - "127.0.0.2:5432:5432" # no conflict: different host IP
-      - "9005:9005"        # no conflict with a's pool
+      - "9005:9005"        # no warning; noted on a's pool
   c:
     image: x
     ports:

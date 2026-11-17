@@ -1,9 +1,9 @@
 import type { Diagnostic } from "@compose-lens/core";
 
 const STYLE = {
-  error: "border-red-200 bg-red-50 text-red-800",
-  warning: "border-amber-200 bg-amber-50 text-amber-800",
-  info: "border-slate-200 bg-slate-50 text-slate-700",
+  error: "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200",
+  warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200",
+  info: "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300",
 } as const;
 
 function where(d: Diagnostic) {
@@ -20,7 +20,7 @@ function Message({ text }: { text: string }) {
     <>
       {text.split("`").map((part, i) =>
         i % 2 === 1 ? (
-          <code key={i} className="rounded bg-white/60 px-0.5">
+          <code key={i} className="rounded bg-white/60 px-0.5 dark:bg-black/30">
             {part}
           </code>
         ) : (

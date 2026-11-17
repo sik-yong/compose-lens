@@ -4,7 +4,7 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 - **Baseline:** [Compose Specification](https://docs.docker.com/reference/compose-file/) as of 2026-11.
 - **Scope:** A single Compose file. Every result describes the *configuration in the file*. Compose Lens never inspects a host or Docker Engine.
-- **Status:** Planned for v0.1.0 (in progress). Items marked *(v0.1.1+)* are deferred and listed under [Known limitations in v0.1.0](#known-limitations-in-v010).
+- **Status:** v0.1.1. Remaining gaps are listed under [Known limitations](#known-limitations).
 
 ## Legend
 
@@ -16,18 +16,18 @@ This document is the source of truth for what Compose Lens understands. If the a
 | **Noted** | Not analyzed; an `unsupported` diagnostic says so |
 | **Ignored** | Accepted silently (valid per spec, no effect on the result) |
 
-**Sub-keys rule** *(v0.1.1+)*: Inside any Analyzed or Shown object (a port, network, volume, `build`, `depends_on` entry, …), a sub-key not listed in this file is **Noted**. When it can change the interpretation, the diagnostic also says which check it limits.
+**Sub-keys rule:** Inside `build`, a long-syntax port, a service's network entry, and a long-syntax volume, a sub-key not listed in this file is **Noted**: one `unsupported` info per service and attribute lists them (for example ``Not analyzed in `build`: `ssh`, `cache_from`.``). `x-*` sub-keys are ignored. Sub-keys of other attributes (`depends_on`, `secrets`, `configs`, `env_file`, `healthcheck`) are not reported.
 
 ## Top-level elements
 
 | Element | Level | Notes |
 |---|---|---|
 | `services` | Analyzed | Must be a mapping, otherwise a `schema` error |
-| `networks` | Analyzed | `external` analyzed (marked "existence not verified"). `name`, `driver`, `internal`, `driver_opts`, `ipam`, `attachable`, `enable_ipv6`, `labels`: not displayed in v0.1.0 |
-| `volumes` | Analyzed | `external` analyzed (marked "existence not verified"). `name`, `driver`, `driver_opts`, `labels`: not displayed in v0.1.0 |
+| `networks` | Analyzed | `external` analyzed (marked "existence not verified"). `name`, `driver`, `internal`, `driver_opts`, `ipam`, `attachable`, `enable_ipv6`, `labels`: not displayed |
+| `volumes` | Analyzed | `external` analyzed (marked "existence not verified"). `name`, `driver`, `driver_opts`, `labels`: not displayed |
 | `name` | Shown | Project name |
 | `version` | Noted | Obsolete in the spec. Info diagnostic only |
-| `secrets`, `configs` | Accepted | Not displayed. Services' references to them are shown by name. Contents and files are never read |
+| `secrets`, `configs` | Analyzed (names only) | Drawn as nodes linked to the services that use them. `external` analyzed (marked "existence not verified"). `file`, `environment`, `content`, and other keys are never read or displayed |
 | `include` | Noted | Warning: the result may be incomplete |
 | `x-*` | Ignored | Extension fields are valid. Anchors defined here are resolved normally |
 | any other key | Noted | Unknown top-level key |
@@ -36,18 +36,18 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 | Attribute | Level | Notes |
 |---|---|---|
-| `image` | Shown | No secret detection guaranteed. See [Masking boundary](#masking-boundary) |
-| `build` | Analyzed (partial) | String or object. `context`, `dockerfile`, `target` shown. `args`: **Masked**. Other `build` keys: Noted |
-| `ports` | Analyzed | Short and long syntax, ranges, host IP, protocol. Long syntax: `target`, `published`, `host_ip`, `protocol` analyzed. `name`, `app_protocol`, `mode`: not displayed in v0.1.0. See [Ports](#ports) |
+| `image` | Shown | URL credentials redacted. See [Masking boundary](#masking-boundary) |
+| `build` | Analyzed (partial) | String or object. `context`, `dockerfile`, `target` shown (URL credentials redacted). `args`: **Masked**. Other `build` keys: Noted |
+| `ports` | Analyzed | Short and long syntax, ranges, host IP, protocol. Long syntax: `target`, `published`, `host_ip`, `protocol` analyzed. `name`, `app_protocol`, `mode` shown. Other keys: Noted. See [Ports](#ports) |
 | `expose` | Shown | |
-| `networks` | Analyzed | List and mapping syntax. `aliases`, `ipv4_address`, `ipv6_address`: not displayed in v0.1.0 |
+| `networks` | Analyzed | List and mapping syntax. `aliases`, `ipv4_address`, `ipv6_address` shown. Other entry keys (`priority`, `mac_address`, …): Noted. An entry must be a mapping or empty |
 | `network_mode` | Analyzed | `none`, `host`, `service:<name>`, `container:<id>`. See [Networks](#networks) |
-| `volumes` | Analyzed | Short and long syntax. See [Volumes](#volumes) |
+| `volumes` | Analyzed | Short and long syntax. Long syntax: `type`, `source`, `target`, `read_only` analyzed. Other keys (`bind`, `volume`, `tmpfs`, `consistency`, …): Noted. See [Volumes](#volumes) |
 | `tmpfs` | Shown | |
 | `depends_on` | Analyzed | Short and long syntax, `condition`, `required`, `restart`. See [depends_on](#depends_on) |
 | `environment` | Masked | List and mapping syntax. Keys only |
-| `env_file` | Shown (paths only) | Files are never read |
-| `secrets`, `configs` | Shown (names only) | |
+| `env_file` | Shown (paths only) | Files are never read. URL credentials redacted |
+| `secrets`, `configs` | Analyzed (names only) | Edges to the top-level definitions. An undeclared name is a `reference` error, a name with a variable is `unresolved` |
 | `container_name`, `hostname`, `restart` | Shown | |
 | `profiles` | Shown | **Not evaluated:** all services are treated as active. Info diagnostic when present |
 | `healthcheck` | Shown (presence only) | `test` is not displayed (may contain secrets) |
@@ -90,8 +90,9 @@ This document is the source of truth for what Compose Lens understands. If the a
 
 - **Potential conflict:** only between fixed bindings with the same protocol, overlapping ports, and overlapping host IP. An unset IP counts as all interfaces of both families. `0.0.0.0` covers all IPv4 addresses and `::` all IPv6 addresses, never the other family. Other addresses overlap only when equal after normalization (`::1` equals `0:0:0:0:0:0:0:1`). Unparseable values compare as written.
 - Host port `0` is dynamically assigned, like an omitted host port.
-- Excluded from conflict checks: dynamic and pool bindings, and ports with a variable anywhere (IP, either port, or protocol), which are reported as `unresolved`.
-- Each conflicting binding gets one warning that names one counterpart. A note for a pool overlapping a fixed binding is *(v0.1.1+)*.
+- Excluded from conflict warnings: dynamic and pool bindings, and ports with a variable anywhere (IP, either port, or protocol), which are reported as `unresolved`.
+- Each conflicting binding gets one warning that names one counterpart.
+- A pool whose range overlaps a fixed binding (same protocol, overlapping host IP) gets one `conflict` **info** naming one counterpart: whether they collide depends on which starts first. Pools overlapping other pools are not reported.
 - Conflicts are reported as "may conflict within this file". Actual host usage is not checked. Profiles are not evaluated.
 
 ### Volumes
@@ -135,13 +136,14 @@ This document is the source of truth for what Compose Lens understands. If the a
 Values of `environment` and `build.args` never appear in generated output: the graph data, detail panel, diagnostics, Mermaid export, or logs. `secrets`, `configs`, and `env_file` show names or paths only.
 
 - **Not displayed:** `command`, `entrypoint`, `labels`, and `healthcheck.test`. Secrets often live there.
-- **Displayed, no secret detection guaranteed:** `image`, `build.context`, `build.dockerfile`, paths, and resource names. Hiding credentials in URL-like values (`scheme://user:pass@…`) is *(v0.1.1+)*.
+- **URL credentials:** In `image`, `build.context`, `build.dockerfile`, `env_file` paths, and bind or other mount sources, the user info of any `scheme://user:pass@host` URL (including a token used as the user name) is replaced with `***`.
+- **Displayed, no other secret detection:** the rest of those values, paths, and resource names are shown as written.
 
-## Known limitations in v0.1.0
+## Known limitations
 
-These are known gaps, not silent behavior. They are planned for v0.1.1 or later.
+These are known gaps, not silent behavior.
 
-- **Sub-keys:** Sub-keys not listed in this file are not analyzed and not reported. Top-level and service-level unsupported fields *are* reported.
-- **Port pools:** No note when a pool range overlaps a fixed binding. Pools are still excluded from conflict checks.
-- **Nested attributes not displayed:** network aliases and static IPs, top-level network/volume `name`, `driver`, and options, and port `name`/`app_protocol`/`mode` are parsed past but not shown.
-- **URL credentials:** Credentials inside displayed values such as `image` or `build.context` are shown as written.
+- **Sub-keys:** Only the attributes listed in the sub-keys rule report unknown sub-keys.
+- **Port pools:** Pools overlapping other pools are not reported.
+- **Top-level resource options:** top-level network/volume `name`, `driver`, and options are parsed past but not shown. A top-level `name` that renames the real resource is not taken into account.
+- **Browsers:** manual verification covers Chromium only. See [verification](verification.md).

@@ -1,4 +1,4 @@
-import type { ComposeGraph, GraphNode } from "./graph.js";
+import type { ComposeGraph, GraphNode, RelationKind } from "./graph.js";
 
 /**
  * Characters allowed as-is inside a quoted Mermaid label. Everything else is
@@ -48,15 +48,46 @@ function nodeLine(n: GraphNode): string {
       return `  ${n.id}([${label}]):::network`;
     case "volume":
       return `  ${n.id}[(${label})]:::volume`;
+    case "secret":
+      return `  ${n.id}{{${label}}}:::secret`;
+    case "config":
+      return `  ${n.id}[/${label}/]:::config`;
   }
 }
 
+/** Mermaid edge curve. `basis` is Mermaid's default and adds no config. */
+export type MermaidCurve = "basis" | "step" | "linear";
+
+export interface MermaidOptions {
+  direction?: "TB" | "LR";
+  curve?: MermaidCurve;
+  /** Relation groups left out of `graph` (see filterGraph), noted in a comment. */
+  hidden?: readonly RelationKind[];
+}
+
+const HIDDEN_NAMES: Record<RelationKind, string> = {
+  depends_on: "depends_on",
+  networks: "networks",
+  network_mode: "network_mode",
+  volumes: "volumes",
+  secrets: "secrets",
+  configs: "configs",
+};
+
 /**
  * Renders the graph as a Mermaid flowchart. Node ids are the graph's internal
- * ids (svc_1, net_1, vol_1), never text from the input.
+ * ids (svc_1, net_1, vol_1), never text from the input. The config front
+ * matter and comment are fixed text.
  */
-export function toMermaid(graph: ComposeGraph, options: { direction?: "TB" | "LR" } = {}): string {
-  const lines = [`flowchart ${options.direction ?? "TB"}`];
+export function toMermaid(graph: ComposeGraph, options: MermaidOptions = {}): string {
+  const lines: string[] = [];
+  if (options.curve && options.curve !== "basis") {
+    lines.push("---", "config:", "  flowchart:", `    curve: ${options.curve}`, "---");
+  }
+  lines.push(`flowchart ${options.direction ?? "TB"}`);
+  if (options.hidden && options.hidden.length > 0) {
+    lines.push(`  %% Hidden relations: ${options.hidden.map((k) => HIDDEN_NAMES[k]).join(", ")}`);
+  }
   for (const n of graph.nodes) lines.push(nodeLine(n));
   for (const e of graph.edges) {
     switch (e.kind) {
@@ -70,11 +101,16 @@ export function toMermaid(graph: ComposeGraph, options: { direction?: "TB" | "LR
         break;
       case "network":
       case "volume":
+      case "secret":
+      case "config":
         lines.push(`  ${e.source} --- ${e.target}`);
         break;
     }
   }
   lines.push("  classDef network fill:#f5f3ff,stroke:#a78bfa,color:#2e1065");
   lines.push("  classDef volume fill:#fffbeb,stroke:#f59e0b,color:#451a03");
+  const kinds = new Set(graph.nodes.map((n) => n.kind));
+  if (kinds.has("secret")) lines.push("  classDef secret fill:#fef2f2,stroke:#f87171,color:#450a0a");
+  if (kinds.has("config")) lines.push("  classDef config fill:#ecfeff,stroke:#22d3ee,color:#083344");
   return `${lines.join("\n")}\n`;
 }

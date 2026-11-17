@@ -9,6 +9,7 @@ function checkReferences(ctx: Context, model: ComposeModel) {
   const services = new Set(model.services.map((s) => s.name));
   const networks = new Set(model.networks.map((n) => n.name));
   const volumes = new Set(model.volumes.map((v) => v.name));
+  const declared = { secrets: new Set(model.secrets.map((r) => r.name)), configs: new Set(model.configs.map((r) => r.name)) };
 
   for (const s of model.services) {
     for (const dep of s.dependsOn) {
@@ -24,6 +25,16 @@ function checkReferences(ctx: Context, model: ComposeModel) {
         ctx.report("unresolved", "warning", servicePath(s, "networks"), `A network name of \`${s.name}\` contains a variable. Its reference is not checked.`);
       } else {
         ctx.report("reference", "error", servicePath(s, "networks"), `\`${s.name}\` uses an undeclared network \`${n.name}\`.`);
+      }
+    }
+    for (const kind of ["secrets", "configs"] as const) {
+      for (const name of s[kind]) {
+        if (declared[kind].has(name)) continue;
+        if (hasVariable(name)) {
+          ctx.report("unresolved", "warning", servicePath(s, kind), `A ${kind.slice(0, -1)} name of \`${s.name}\` contains a variable. Its reference is not checked.`);
+        } else {
+          ctx.report("reference", "error", servicePath(s, kind), `\`${s.name}\` uses an undeclared ${kind.slice(0, -1)} \`${name}\`.`);
+        }
       }
     }
     for (const m of s.volumes) {
@@ -65,10 +76,20 @@ type Binding = { service: Service; port: PortMapping; protocol: string; start: n
  */
 function checkPortConflicts(ctx: Context, model: ComposeModel) {
   const fixed: Binding[] = [];
+  const pools: Binding[] = [];
   for (const s of model.services) {
     for (const p of s.ports) {
       if (p.host.kind === "fixed") {
         fixed.push({
+          service: s,
+          port: p,
+          protocol: p.protocol.toLowerCase(),
+          start: p.host.ports.start,
+          end: p.host.ports.end,
+          ip: hostIp(p.hostIp),
+        });
+      } else if (p.host.kind === "pool") {
+        pools.push({
           service: s,
           port: p,
           protocol: p.protocol.toLowerCase(),
@@ -110,10 +131,33 @@ function checkPortConflicts(ctx: Context, model: ComposeModel) {
       `${who} host port ${port}/${b.port.protocol} more than once. They may conflict if run together (the host itself is not checked).`,
     );
   }
+  checkPortPools(ctx, fixed, pools);
+}
+
+/**
+ * Notes each pool binding (a host range with one container port) whose range
+ * overlaps a fixed binding. Docker picks a free port from the pool when the
+ * container starts, so whether they collide depends on start order.
+ */
+function checkPortPools(ctx: Context, fixed: Binding[], pools: Binding[]) {
+  for (const pool of pools) {
+    const other = fixed.find(
+      (b) => b.protocol === pool.protocol && b.start <= pool.end && b.end >= pool.start && hostIpsOverlap(b.ip, pool.ip),
+    );
+    if (!other) continue;
+    const range = `${pool.start}-${pool.end}/${pool.port.protocol}`;
+    const port = Math.max(pool.start, other.start);
+    ctx.report(
+      "conflict",
+      "info",
+      servicePath(pool.service, "ports", pool.port.index),
+      `\`${pool.service.name}\` takes one free host port from ${range}, which overlaps host port ${port} of \`${other.service.name}\`. They may conflict depending on which starts first.`,
+    );
+  }
 }
 
 function checkExternalAndProfiles(ctx: Context, model: ComposeModel) {
-  for (const kind of ["networks", "volumes"] as const) {
+  for (const kind of ["networks", "volumes", "secrets", "configs"] as const) {
     for (const r of model[kind]) {
       if (r.external) {
         ctx.report("unverifiable", "info", [kind, r.name], `External ${kind.slice(0, -1)} \`${r.name}\`: its existence is not verified.`);

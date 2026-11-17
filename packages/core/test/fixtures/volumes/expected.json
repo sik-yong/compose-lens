@@ -179,6 +179,8 @@
         "external": true,
         "implicit": false
       }
-    ]
+    ],
+    "secrets": [],
+    "configs": []
   }
 }

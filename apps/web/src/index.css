@@ -1,7 +1,18 @@
 @import "tailwindcss";
 
+/* Theme comes from <html data-theme>, set from the user's choice or the system setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  background: #f8fafc;
+}
+
+[data-theme="dark"] body {
+  background: #020617;
 }

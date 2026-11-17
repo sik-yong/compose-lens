@@ -2,11 +2,11 @@ import type { Diagnostic } from "./diagnostics.js";
 import { LIMITS } from "./limits.js";
 import type { ComposeModel, DependencyCondition } from "./model.js";
 
-export type GraphNodeKind = "service" | "network" | "volume";
-export type GraphEdgeKind = "depends_on" | "network" | "volume" | "network_mode";
+export type GraphNodeKind = "service" | "network" | "volume" | "secret" | "config";
+export type GraphEdgeKind = "depends_on" | "network" | "volume" | "network_mode" | "secret" | "config";
 
 export interface GraphNode {
-  /** Internal id (svc_1, net_1, vol_1). Never derived from input text. */
+  /** Internal id (svc_1, net_1, vol_1, sec_1, cfg_1). Never derived from input text. */
   id: string;
   kind: GraphNodeKind;
   /** Name from the Compose file. Render as text only. */
@@ -18,9 +18,9 @@ export interface GraphNode {
 export interface GraphEdge {
   id: string;
   kind: GraphEdgeKind;
-  /** depends_on / network_mode: the dependent service. network/volume: the service. */
+  /** depends_on / network_mode: the dependent service. Others: the service. */
   source: string;
-  /** depends_on: dependency. network/volume: the resource. */
+  /** depends_on / network_mode: the other service. Others: the resource. */
   target: string;
   label?: string;
   /** depends_on with required: false. */
@@ -45,6 +45,8 @@ export function toGraph(model: ComposeModel): { graph?: ComposeGraph; diagnostic
   const serviceIds = new Map<string, string>();
   const networkIds = new Map<string, string>();
   const volumeIds = new Map<string, string>();
+  const secretIds = new Map<string, string>();
+  const configIds = new Map<string, string>();
 
   model.services.forEach((s, i) => {
     const id = `svc_${i + 1}`;
@@ -60,6 +62,16 @@ export function toGraph(model: ComposeModel): { graph?: ComposeGraph; diagnostic
     const id = `vol_${i + 1}`;
     volumeIds.set(v.name, id);
     nodes.push({ id, kind: "volume", label: v.name, external: v.external, implicit: false });
+  });
+  model.secrets.forEach((r, i) => {
+    const id = `sec_${i + 1}`;
+    secretIds.set(r.name, id);
+    nodes.push({ id, kind: "secret", label: r.name, external: r.external, implicit: false });
+  });
+  model.configs.forEach((r, i) => {
+    const id = `cfg_${i + 1}`;
+    configIds.set(r.name, id);
+    nodes.push({ id, kind: "config", label: r.name, external: r.external, implicit: false });
   });
 
   const add = (edge: Omit<GraphEdge, "id">) => edges.push({ ...edge, id: `e_${edges.length + 1}` });
@@ -87,6 +99,16 @@ export function toGraph(model: ComposeModel): { graph?: ComposeGraph; diagnostic
         add({ kind: "volume", source, target, optional: false });
       }
     }
+    for (const [kind, ids] of [["secret", secretIds], ["config", configIds]] as const) {
+      const linked = new Set<string>();
+      for (const name of s[`${kind}s`]) {
+        const target = ids.get(name);
+        if (target && !linked.has(target)) {
+          linked.add(target);
+          add({ kind, source, target, optional: false });
+        }
+      }
+    }
   }
 
   if (nodes.length + edges.length > LIMITS.maxGraphElements) {
@@ -102,4 +124,41 @@ export function toGraph(model: ComposeModel): { graph?: ComposeGraph; diagnostic
     };
   }
   return { graph: { nodes, edges }, diagnostics: [] };
+}
+
+/** Relation groups that can be hidden. Service nodes are always kept. */
+export type RelationKind = "depends_on" | "networks" | "network_mode" | "volumes" | "secrets" | "configs";
+
+export const RELATION_KINDS: readonly RelationKind[] = ["depends_on", "networks", "network_mode", "volumes", "secrets", "configs"];
+
+const RELATION_OF: Record<GraphEdgeKind, RelationKind> = {
+  depends_on: "depends_on",
+  network: "networks",
+  network_mode: "network_mode",
+  volume: "volumes",
+  secret: "secrets",
+  config: "configs",
+};
+
+/** The relation group a resource node belongs to. */
+const NODE_RELATION: Record<Exclude<GraphNodeKind, "service">, RelationKind> = {
+  network: "networks",
+  volume: "volumes",
+  secret: "secrets",
+  config: "configs",
+};
+
+/**
+ * Keeps only the chosen relation groups. Hiding `networks`, `volumes`,
+ * `secrets`, or `configs` drops those resource nodes and their edges;
+ * `network_mode` and `depends_on` are service-to-service edges only.
+ * Node and edge ids are unchanged.
+ */
+export function filterGraph(graph: ComposeGraph, shown: ReadonlySet<RelationKind>): ComposeGraph {
+  return {
+    nodes: graph.nodes.filter(
+      (n) => n.kind === "service" || shown.has(NODE_RELATION[n.kind]),
+    ),
+    edges: graph.edges.filter((e) => shown.has(RELATION_OF[e.kind])),
+  };
 }

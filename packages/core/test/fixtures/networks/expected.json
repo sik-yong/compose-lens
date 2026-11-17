@@ -119,7 +119,10 @@
         "networks": [
           {
             "name": "front",
-            "implicit": false
+            "implicit": false,
+            "aliases": [
+              "api"
+            ]
           }
         ],
         "volumes": [],
@@ -172,6 +175,8 @@
         "implicit": false
       }
     ],
-    "volumes": []
+    "volumes": [],
+    "secrets": [],
+    "configs": []
   }
 }

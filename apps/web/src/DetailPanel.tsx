@@ -1,10 +1,19 @@
-import { hasVariable, type ComposeModel, type GraphNode, type Mount, type NetworkMode, type PortMapping, type Service } from "@compose-lens/core";
+import {
+  hasVariable,
+  type ComposeModel,
+  type GraphNode,
+  type Mount,
+  type NetworkMode,
+  type PortMapping,
+  type Service,
+  type ServiceNetwork,
+} from "@compose-lens/core";
 import type { ReactNode } from "react";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[96px_1fr] gap-2 py-1">
-      <dt className="text-slate-500">{label}</dt>
+      <dt className="text-slate-500 dark:text-slate-400">{label}</dt>
       <dd className="min-w-0 break-words">{children}</dd>
     </div>
   );
@@ -12,7 +21,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 const List = ({ items }: { items: ReactNode[] }) =>
   items.length === 0 ? (
-    <span className="text-slate-400">none</span>
+    <span className="text-slate-400 dark:text-slate-500">none</span>
   ) : (
     <ul className="space-y-0.5">
       {items.map((item, i) => (
@@ -33,7 +42,14 @@ function port(p: PortMapping) {
   return (
     <>
       <code>{p.raw}</code>
-      {note && <span className="text-slate-500"> · {note}</span>}
+      {note && <span className="text-slate-500 dark:text-slate-400"> · {note}</span>}
+      {(p.name || p.appProtocol || p.mode) && (
+        <span className="block text-xs text-slate-500 dark:text-slate-400">
+          {[p.name && `name ${p.name}`, p.appProtocol && `app protocol ${p.appProtocol}`, p.mode && `mode ${p.mode}`]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
+      )}
     </>
   );
 }
@@ -43,14 +59,14 @@ function mount(m: Mount) {
   const kind = m.kind === "other" ? m.type : m.kind === "unresolved" ? "volume" : m.kind;
   return (
     <>
-      <span className="text-slate-500">{kind}</span> <code>{where}</code>
-      {m.readOnly && <span className="text-slate-500"> (read-only)</span>}
+      <span className="text-slate-500 dark:text-slate-400">{kind}</span> <code>{where}</code>
+      {m.readOnly && <span className="text-slate-500 dark:text-slate-400"> (read-only)</span>}
       {m.kind === "unresolved" && <Unresolved />}
     </>
   );
 }
 
-const Unresolved = () => <span className="text-amber-700"> (contains a variable, not resolved)</span>;
+const Unresolved = () => <span className="text-amber-700 dark:text-amber-400"> (contains a variable, not resolved)</span>;
 
 function networkMode(mode: NetworkMode) {
   switch (mode.kind) {
@@ -67,6 +83,21 @@ function networkMode(mode: NetworkMode) {
     case "unresolved":
       return <><code>{mode.raw}</code><Unresolved /></>;
   }
+}
+
+function network(n: ServiceNetwork) {
+  const details = [
+    n.aliases && n.aliases.length > 0 && `aliases ${n.aliases.join(", ")}`,
+    n.ipv4Address && `IPv4 ${n.ipv4Address}`,
+    n.ipv6Address && `IPv6 ${n.ipv6Address}`,
+  ].filter(Boolean);
+  return (
+    <>
+      {n.name}
+      {n.implicit && <span className="text-slate-500 dark:text-slate-400"> (implicit)</span>}
+      {details.length > 0 && <span className="block text-xs text-slate-500 dark:text-slate-400">{details.join(" · ")}</span>}
+    </>
+  );
 }
 
 const CONDITION: Record<string, string> = {
@@ -105,7 +136,7 @@ function ServiceDetails({ service }: { service: Service }) {
         {service.networkMode ? (
           networkMode(service.networkMode)
         ) : (
-          <List items={service.networks.map((n) => (n.implicit ? `${n.name} (implicit)` : n.name))} />
+          <List items={service.networks.map(network)} />
         )}
       </Row>
       <Row label="Volumes"><List items={service.volumes.map(mount)} /></Row>
@@ -114,27 +145,27 @@ function ServiceDetails({ service }: { service: Service }) {
         <List
           items={service.dependsOn.map((d) => (
             <>
-              <strong>{d.service}</strong> <span className="text-slate-500">— {CONDITION[d.condition]}</span>
-              {!d.required && <span className="text-slate-500"> (optional)</span>}
-              {d.restart && <span className="text-slate-500"> (restarts with it)</span>}
+              <strong>{d.service}</strong> <span className="text-slate-500 dark:text-slate-400">— {CONDITION[d.condition]}</span>
+              {!d.required && <span className="text-slate-500 dark:text-slate-400"> (optional)</span>}
+              {d.restart && <span className="text-slate-500 dark:text-slate-400"> (restarts with it)</span>}
             </>
           ))}
         />
       </Row>
       <Row label="Environment">
         {service.environmentKeys.length === 0 ? (
-          <span className="text-slate-400">none</span>
+          <span className="text-slate-400 dark:text-slate-500">none</span>
         ) : (
           <>
             {service.environmentKeys.join(", ")}
-            <div className="text-xs text-slate-500">Values are hidden.</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Values are hidden.</div>
           </>
         )}
       </Row>
       {service.envFiles.length > 0 && (
         <Row label="env_file">
           <List items={service.envFiles.map((f) => <code>{f}</code>)} />
-          <div className="text-xs text-slate-500">Files are not read.</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Files are not read.</div>
         </Row>
       )}
       {service.secrets.length > 0 && <Row label="Secrets">{service.secrets.join(", ")}</Row>}
@@ -155,15 +186,22 @@ export function DetailPanel({ node, model }: { node: GraphNode; model: ComposeMo
       </div>
     );
   }
-  const users = model.services.filter((s) =>
-    node.kind === "network"
-      ? s.networks.some((n) => n.name === node.label)
-      : s.volumes.some((m) => m.kind === "named" && m.source === node.label),
-  );
+  const users = model.services.filter((s) => {
+    switch (node.kind) {
+      case "network":
+        return s.networks.some((n) => n.name === node.label);
+      case "volume":
+        return s.volumes.some((m) => m.kind === "named" && m.source === node.label);
+      case "secret":
+        return s.secrets.includes(node.label);
+      case "config":
+        return s.configs.includes(node.label);
+    }
+  });
   return (
     <div>
       <h2 className="mb-2 text-base font-semibold">
-        <span className="font-normal text-slate-500">{node.kind}</span> {node.label}
+        <span className="font-normal text-slate-500 dark:text-slate-400">{node.kind}</span> {node.label}
       </h2>
       <dl className="text-sm">
         {node.implicit && <Row label="Declared">No. Compose creates it for services without networks.</Row>}
@@ -171,9 +209,12 @@ export function DetailPanel({ node, model }: { node: GraphNode; model: ComposeMo
         <Row label="Used by"><List items={users.map((s) => s.name)} /></Row>
       </dl>
       {node.kind === "network" && (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           Services on the same network can reach each other by configuration. This does not show actual traffic.
         </p>
+      )}
+      {(node.kind === "secret" || node.kind === "config") && (
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Names only. Contents and sources are never read or shown.</p>
       )}
     </div>
   );

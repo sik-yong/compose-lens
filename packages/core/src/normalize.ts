@@ -2,7 +2,8 @@ import type { Diagnostic, DocumentPath } from "./diagnostics.js";
 import { LIMITS } from "./limits.js";
 import { checkModel } from "./checks.js";
 import { Context, hasVariable, type Locate } from "./context.js";
-import { SERVICE_INCOMPLETE, SERVICE_KNOWN, TOP_LEVEL_INCOMPLETE, TOP_LEVEL_KNOWN, isExtension } from "./fields.js";
+import { SERVICE_INCOMPLETE, SERVICE_KNOWN, SUB_KEYS_KNOWN, TOP_LEVEL_INCOMPLETE, TOP_LEVEL_KNOWN, isExtension } from "./fields.js";
+import { redactUrlCredentials } from "./redact.js";
 import type {
   BuildInfo,
   ComposeModel,
@@ -18,6 +19,18 @@ import type {
 } from "./model.js";
 
 type Obj = Record<string, unknown>;
+
+/** Collects sub-keys that aren't analyzed, per service attribute (see SUB_KEYS_KNOWN). */
+type Unanalyzed = Map<keyof typeof SUB_KEYS_KNOWN, Set<string>>;
+
+function noteSubKeys(seen: Unanalyzed, field: keyof typeof SUB_KEYS_KNOWN, entry: Obj) {
+  for (const key of Object.keys(entry)) {
+    if (SUB_KEYS_KNOWN[field].has(key) || isExtension(key)) continue;
+    const keys = seen.get(field) ?? new Set<string>();
+    keys.add(key);
+    seen.set(field, keys);
+  }
+}
 
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown): string | undefined =>
@@ -136,10 +149,18 @@ function parseLongPort(entry: Obj): Omit<PortMapping, "index"> | undefined {
   const hostIp = str(entry["host_ip"]);
   const protocol = str(entry["protocol"]) ?? "tcp";
   const raw = `${hostIp ? `${hostIp}:` : ""}${published ? `${published}:` : ""}${target}/${protocol}`;
-  return makePort(raw, published, target, protocol, hostIp);
+  const mapping = makePort(raw, published, target, protocol, hostIp);
+  if (!mapping) return undefined;
+  const name = str(entry["name"]);
+  const appProtocol = str(entry["app_protocol"]);
+  const mode = str(entry["mode"]);
+  if (name !== undefined) mapping.name = name;
+  if (appProtocol !== undefined) mapping.appProtocol = appProtocol;
+  if (mode !== undefined) mapping.mode = mode;
+  return mapping;
 }
 
-function normalizePorts(ctx: Context, value: unknown, path: DocumentPath): PortMapping[] {
+function normalizePorts(ctx: Context, value: unknown, path: DocumentPath, seen: Unanalyzed): PortMapping[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
     ctx.schema(path, "`ports` must be a list.");
@@ -148,6 +169,7 @@ function normalizePorts(ctx: Context, value: unknown, path: DocumentPath): PortM
   const result: PortMapping[] = [];
   value.forEach((entry, i) => {
     const text = str(entry);
+    if (isObj(entry)) noteSubKeys(seen, "ports", entry);
     const mapping = text !== undefined ? parseShortPort(text) : isObj(entry) ? parseLongPort(entry) : undefined;
     if (mapping) result.push({ ...mapping, index: i });
     else ctx.schema([...path, i], "Invalid port mapping.");
@@ -186,7 +208,8 @@ function parseShortMount(raw: string): Omit<Mount, "index"> | undefined {
   if (parts.length === 1) return raw === "" ? undefined : { kind: "anonymous", target: raw, readOnly: false };
   const [source = "", target = "", mode = ""] = parts;
   if (parts.length > 3 || parts.some((part) => part === "")) return undefined;
-  return { kind: classifySource(source), source, target, readOnly: mode.split(",").includes("ro") };
+  const kind = classifySource(source);
+  return { kind, source: kind === "bind" ? redactUrlCredentials(source) : source, target, readOnly: mode.split(",").includes("ro") };
 }
 
 function parseLongMount(entry: Obj): Omit<Mount, "index"> | undefined {
@@ -201,13 +224,13 @@ function parseLongMount(entry: Obj): Omit<Mount, "index"> | undefined {
   else if (type === undefined) return undefined;
   else kind = "other";
   const mount: Omit<Mount, "index"> = { kind, readOnly };
-  if (source) mount.source = source;
+  if (source) mount.source = kind === "bind" || kind === "other" ? redactUrlCredentials(source) : source;
   if (target) mount.target = target;
   if (kind === "other") mount.type = type;
   return mount;
 }
 
-function normalizeVolumes(ctx: Context, value: unknown, path: DocumentPath): Mount[] {
+function normalizeVolumes(ctx: Context, value: unknown, path: DocumentPath, seen: Unanalyzed): Mount[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) {
     ctx.schema(path, "`volumes` must be a list.");
@@ -215,6 +238,7 @@ function normalizeVolumes(ctx: Context, value: unknown, path: DocumentPath): Mou
   }
   const result: Mount[] = [];
   value.forEach((entry, i) => {
+    if (isObj(entry)) noteSubKeys(seen, "volumes", entry);
     const mount =
       typeof entry === "string" ? parseShortMount(entry) : isObj(entry) ? parseLongMount(entry) : undefined;
     if (mount) result.push({ ...mount, index: i });
@@ -291,13 +315,32 @@ function normalizeServiceNetworks(
   value: unknown,
   networkMode: string | undefined,
   path: DocumentPath,
+  seen: Unanalyzed,
 ): ServiceNetwork[] {
   let names: string[] = [];
+  const attributes = new Map<string, Omit<ServiceNetwork, "name" | "implicit">>();
   if (Array.isArray(value)) {
     names = value.filter((n): n is string => typeof n === "string");
     if (names.length !== value.length) ctx.schema(path, "`networks` entries must be network names.");
   } else if (isObj(value)) {
     names = Object.keys(value);
+    for (const [name, entry] of Object.entries(value)) {
+      if (entry === null || entry === undefined) continue;
+      if (!isObj(entry)) {
+        ctx.schema([...path, name], "A network entry must be a mapping or empty.");
+        continue;
+      }
+      noteSubKeys(seen, "networks", entry);
+      const attrs: Omit<ServiceNetwork, "name" | "implicit"> = {};
+      const aliases = entry["aliases"];
+      if (Array.isArray(aliases) && aliases.every((a) => str(a) !== undefined)) attrs.aliases = aliases.map((a) => str(a)!);
+      else if (aliases !== undefined && aliases !== null) ctx.schema([...path, name, "aliases"], "`aliases` must be a list of names.");
+      const ipv4 = str(entry["ipv4_address"]);
+      const ipv6 = str(entry["ipv6_address"]);
+      if (ipv4 !== undefined) attrs.ipv4Address = ipv4;
+      if (ipv6 !== undefined) attrs.ipv6Address = ipv6;
+      attributes.set(name, attrs);
+    }
   } else if (value !== undefined && value !== null) {
     ctx.schema(path, "`networks` must be a list or a mapping.");
   }
@@ -307,7 +350,7 @@ function normalizeServiceNetworks(
     return [];
   }
   if (names.length === 0) return [{ name: "default", implicit: true }];
-  return names.map((name) => ({ name, implicit: false }));
+  return names.map((name) => ({ name, implicit: false, ...attributes.get(name) }));
 }
 
 // ---------- service ----------
@@ -325,19 +368,20 @@ function keysOf(ctx: Context, value: unknown, path: DocumentPath, field: string)
   return [];
 }
 
-function normalizeBuild(ctx: Context, value: unknown, path: DocumentPath): BuildInfo | undefined {
+function normalizeBuild(ctx: Context, value: unknown, path: DocumentPath, seen: Unanalyzed): BuildInfo | undefined {
   if (value === undefined) return undefined;
-  if (typeof value === "string") return { context: value, argKeys: [] };
+  if (typeof value === "string") return { context: redactUrlCredentials(value), argKeys: [] };
   if (!isObj(value)) {
     ctx.schema(path, "`build` must be a string or a mapping.");
     return undefined;
   }
+  noteSubKeys(seen, "build", value);
   const build: BuildInfo = { argKeys: keysOf(ctx, value["args"], [...path, "args"], "build.args") };
   const context = str(value["context"]);
   const dockerfile = str(value["dockerfile"]);
   const target = str(value["target"]);
-  if (context !== undefined) build.context = context;
-  if (dockerfile !== undefined) build.dockerfile = dockerfile;
+  if (context !== undefined) build.context = redactUrlCredentials(context);
+  if (dockerfile !== undefined) build.dockerfile = redactUrlCredentials(dockerfile);
   if (target !== undefined) build.target = target;
   return build;
 }
@@ -376,10 +420,10 @@ function sourceNames(ctx: Context, value: unknown, path: DocumentPath, field: st
 /** env_file: a path, or a list of paths or `{ path, required }`. Paths only; files are never read. */
 function envFilePaths(ctx: Context, value: unknown, path: DocumentPath): string[] {
   if (value === undefined || value === null) return [];
-  if (typeof value === "string") return [value];
+  if (typeof value === "string") return [redactUrlCredentials(value)];
   if (Array.isArray(value)) {
     const paths = value.map((entry) => (isObj(entry) ? str(entry["path"]) : str(entry)));
-    if (paths.every((p): p is string => p !== undefined)) return paths;
+    if (paths.every((p): p is string => p !== undefined)) return paths.map(redactUrlCredentials);
   }
   ctx.schema(path, "`env_file` must be a path or a list of paths.");
   return [];
@@ -403,12 +447,13 @@ function normalizeService(ctx: Context, name: string, value: unknown): Service {
   reportUnsupportedServiceKeys(ctx, def, path);
 
   const networkModeRaw = str(def["network_mode"]);
+  const seen: Unanalyzed = new Map();
   const service: Service = {
     name,
-    ports: normalizePorts(ctx, def["ports"], [...path, "ports"]),
+    ports: normalizePorts(ctx, def["ports"], [...path, "ports"], seen),
     expose: stringList(ctx, def["expose"], [...path, "expose"], "expose"),
-    networks: normalizeServiceNetworks(ctx, def["networks"], networkModeRaw, [...path, "networks"]),
-    volumes: normalizeVolumes(ctx, def["volumes"], [...path, "volumes"]),
+    networks: normalizeServiceNetworks(ctx, def["networks"], networkModeRaw, [...path, "networks"], seen),
+    volumes: normalizeVolumes(ctx, def["volumes"], [...path, "volumes"], seen),
     tmpfs: stringList(ctx, def["tmpfs"], [...path, "tmpfs"], "tmpfs", true),
     dependsOn: normalizeDependsOn(ctx, def["depends_on"], [...path, "depends_on"]),
     environmentKeys: keysOf(ctx, def["environment"], [...path, "environment"], "environment"),
@@ -419,16 +464,21 @@ function normalizeService(ctx: Context, name: string, value: unknown): Service {
     hasHealthcheck: isObj(def["healthcheck"]) && def["healthcheck"]["disable"] !== true,
   };
   const image = str(def["image"]);
-  const build = normalizeBuild(ctx, def["build"], [...path, "build"]);
+  const build = normalizeBuild(ctx, def["build"], [...path, "build"], seen);
   const containerName = str(def["container_name"]);
   const hostname = str(def["hostname"]);
   const restart = str(def["restart"]);
-  if (image !== undefined) service.image = image;
+  if (image !== undefined) service.image = redactUrlCredentials(image);
   if (build) service.build = build;
   if (containerName !== undefined) service.containerName = containerName;
   if (hostname !== undefined) service.hostname = hostname;
   if (restart !== undefined) service.restart = restart;
   if (networkModeRaw !== undefined) service.networkMode = parseNetworkMode(networkModeRaw);
+  for (const field of Object.keys(SUB_KEYS_KNOWN) as (keyof typeof SUB_KEYS_KNOWN)[]) {
+    const keys = seen.get(field);
+    if (!keys) continue;
+    ctx.report("unsupported", "info", [...path, field], `Not analyzed in \`${field}\`: ${[...keys].map((k) => `\`${k}\``).join(", ")}.`);
+  }
   return service;
 }
 
@@ -445,7 +495,7 @@ function reportTopLevelKeys(ctx: Context, root: Obj) {
   }
 }
 
-function normalizeResources(ctx: Context, value: unknown, field: "networks" | "volumes"): ResourceDef[] {
+function normalizeResources(ctx: Context, value: unknown, field: "networks" | "volumes" | "secrets" | "configs"): ResourceDef[] {
   if (value === undefined || value === null) return [];
   if (!isObj(value)) {
     ctx.schema([field], `Top-level \`${field}\` must be a mapping.`);
@@ -498,6 +548,8 @@ export function normalize(
     services: normalizedServices,
     networks: normalizeResources(ctx, value["networks"], "networks"),
     volumes: normalizeResources(ctx, value["volumes"], "volumes"),
+    secrets: normalizeResources(ctx, value["secrets"], "secrets"),
+    configs: normalizeResources(ctx, value["configs"], "configs"),
   };
   const projectName = str(value["name"]);
   if (projectName !== undefined) model.name = projectName;

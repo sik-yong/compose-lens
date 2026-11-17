@@ -274,6 +274,8 @@
         "implicit": true
       }
     ],
-    "volumes": []
+    "volumes": [],
+    "secrets": [],
+    "configs": []
   }
 }

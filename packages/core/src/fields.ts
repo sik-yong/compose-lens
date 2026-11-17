@@ -31,6 +31,17 @@ export const SERVICE_KNOWN = new Set([
   "labels",
 ]);
 
+/**
+ * Sub-keys of service attributes that are analyzed or shown. Others are listed
+ * once per service and attribute as "not analyzed".
+ */
+export const SUB_KEYS_KNOWN = {
+  build: new Set(["context", "dockerfile", "target", "args"]),
+  ports: new Set(["target", "published", "host_ip", "protocol", "name", "app_protocol", "mode"]),
+  networks: new Set(["aliases", "ipv4_address", "ipv6_address"]),
+  volumes: new Set(["type", "source", "target", "read_only"]),
+} as const;
+
 /** Service attributes whose absence from analysis can make the graph incomplete. */
 export const SERVICE_INCOMPLETE = new Set(["extends"]);
 

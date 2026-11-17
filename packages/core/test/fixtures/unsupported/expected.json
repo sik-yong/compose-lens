@@ -10,10 +10,12 @@
   "nodes": [
     "service app",
     "service db",
-    "network default implicit"
+    "network default implicit",
+    "secret token"
   ],
   "edges": [
     "app -network-> default",
+    "app -secret-> token",
     "db -network-> default"
   ],
   "model": {
@@ -79,6 +81,14 @@
         "implicit": true
       }
     ],
-    "volumes": []
+    "volumes": [],
+    "secrets": [
+      {
+        "name": "token",
+        "external": false,
+        "implicit": false
+      }
+    ],
+    "configs": []
   }
 }

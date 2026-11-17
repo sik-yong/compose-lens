@@ -39,6 +39,8 @@
       }
     ],
     "networks": [],
-    "volumes": []
+    "volumes": [],
+    "secrets": [],
+    "configs": []
   }
 }
