@@ -4,6 +4,8 @@ import sample from "../../../examples/basic/compose.yaml?raw";
 import { DetailPanel } from "./DetailPanel.js";
 import { Diagnostics } from "./Diagnostics.js";
 import { GraphView } from "./GraphView.js";
+import type { Direction } from "./layout.js";
+import { MermaidExport } from "./MermaidExport.js";
 
 const MAX_MIB = LIMITS.maxInputBytes / 1024 / 1024;
 
@@ -21,6 +23,9 @@ export function App() {
   const [text, setText] = useState(sample);
   const [fileError, setFileError] = useState<string>();
   const [selected, setSelected] = useState<GraphNode>();
+  const [showMermaid, setShowMermaid] = useState(false);
+  // Top to bottom reads best for typical stacks: dependencies flow down to shared networks and volumes.
+  const [direction, setDirection] = useState<Direction>("TB");
   const input = useDebounced(text, 250);
   const result = useMemo(() => analyze(input), [input]);
 
@@ -93,7 +98,27 @@ export function App() {
         </section>
         <section className="relative min-h-96">
           {result.graph && result.model ? (
-            <GraphView graph={result.graph} model={result.model} onSelect={setSelected} />
+            <>
+              <GraphView key={direction} graph={result.graph} model={result.model} direction={direction} onSelect={setSelected} />
+              <div className="absolute top-3 left-3 flex gap-1.5">
+                <button
+                  type="button"
+                  className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm hover:bg-slate-100"
+                  onClick={() => setDirection(direction === "LR" ? "TB" : "LR")}
+                  title="Switch layout direction"
+                >
+                  {direction === "LR" ? "Left → right" : "Top → bottom"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm hover:bg-slate-100"
+                  onClick={() => setShowMermaid(true)}
+                >
+                  Export Mermaid
+                </button>
+              </div>
+              {showMermaid && <MermaidExport graph={result.graph} direction={direction} onClose={() => setShowMermaid(false)} />}
+            </>
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-slate-400">
               Fix the problems on the left to see the graph.

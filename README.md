@@ -4,35 +4,76 @@
 
 **Docker Compose 파일의 구조를 브라우저에서 한눈에.**
 
-Compose Lens에 `compose.yaml`을 붙여넣거나 끌어다 놓으면 서비스·네트워크·볼륨을 그래프로 보여 줄 예정입니다. 설정 문제를 알려 주고, README에 바로 넣을 수 있는 Mermaid 다이어그램도 내보낼 수 있게 할 계획입니다.
+`compose.yaml`을 붙여넣거나 끌어다 놓으면 서비스·네트워크·볼륨을 그래프로 보여 주고, 설정 문제를 알려 주며, README에 바로 넣을 수 있는 Mermaid 다이어그램을 내보냅니다. 모든 처리는 브라우저 안에서만 이루어집니다.
 
-> **상태: pre-alpha, 아직 사용할 수 없습니다.** v0.1.0을 구현하고 있습니다. 아래 내용은 모두 예정된 동작입니다. 설계는 [PRD](docs/PRD.md)와 [support matrix](docs/support-matrix.md)(영문)에 있으며 계속 검토 중입니다.
+**[웹앱 열기 →](https://sik-yong.github.io/compose-lens/)**
 
-## 왜 만드나요
+![Compose Lens 화면: 왼쪽은 Compose YAML 편집기, 오른쪽은 서비스·네트워크·볼륨 그래프](docs/images/screenshot.png)
 
-서비스가 몇 개만 넘어가도 YAML만으로는 구조를 읽기 어렵습니다. Compose Lens는 **정확성을 가장 먼저** 생각합니다.
+> **상태: alpha.** v0.1.0 공개를 준비하고 있습니다. 지원 범위는 [support matrix](docs/support-matrix.md)(영문)에, 설계는 [PRD](docs/PRD.md)에 있습니다.
 
-- 파일에 실제로 설정된 것만 말합니다. `depends_on`은 시작 순서로 보여 주고, 트래픽으로 표현하지 않습니다. 같은 네트워크에 있다는 것은 "같은 네트워크에 있음"이지 "서로 통신함"이 아닙니다.
-- 추측하지 않습니다. 해석되지 않은 `${VARIABLES}`, 외부 리소스, 지원하지 않는 필드는 조용히 채우거나 무시하지 않고 그렇다고 표시합니다.
-- 무엇을 지원하고 무엇을 지원하지 않는지 [support matrix](docs/support-matrix.md)에 적어 둡니다.
+## 기능
 
-## v0.1.0 예정 기능
-
-- 파일 업로드 또는 붙여넣기로 Compose 파일 불러오기
+- 파일 업로드·끌어다 놓기·붙여넣기로 Compose 파일 불러오기
 - 인터랙티브 그래프: 서비스, 네트워크, named volume을 자동 배치하고 드래그·확대·축소 지원
-- 서비스 상세 패널: 이미지, 빌드, 포트, 네트워크, 볼륨, 환경변수 키
+- 서비스 상세 패널: 이미지, 빌드, 포트, 네트워크, 볼륨, 의존 관계, 환경변수 키(값은 숨김)
 - 진단:
   - 줄·열 정보가 있는 YAML 문법 오류
   - 존재하지 않는 서비스·네트워크·볼륨 참조
-  - 호스트 포트 충돌 가능성
-  - 지원하지 않는 필드
-- Mermaid 내보내기
+  - 이 파일 안에서의 호스트 포트 충돌 가능성 (프로토콜·IP·범위 고려)
+  - 해석되지 않은 `${VARIABLES}`, 지원하지 않는 필드
+- Mermaid 내보내기: 복사, README용 복사, `.mmd` 파일 저장
 
-## 개인정보 (설계 목표)
+## 정확성 원칙
 
-- **로컬 처리:** 모든 처리는 브라우저 안에서만 이루어질 예정입니다. Compose 파일을 업로드하지 않으며, 외부 CDN·폰트·분석 도구를 불러오지 않습니다.
-- **값 가리기:** `environment`와 `build.args`의 값은 모든 생성 결과에서 가립니다.
-- **한계:** `command`, `entrypoint`, `labels`, `healthcheck.test`는 표시하지 않습니다. 이미지 이름이나 URL처럼 표시되는 값 안의 비밀 정보는 탐지를 보장하지 않습니다. 자세한 내용은 [마스킹 경계](docs/support-matrix.md#masking-boundary)를 참고하세요.
+- 파일에 실제로 설정된 것만 말합니다. `depends_on`은 시작 순서로 보여 주고, 트래픽으로 표현하지 않습니다. 같은 네트워크에 있다는 것은 "설정상 같은 네트워크"이지 "서로 통신함"이 아닙니다.
+- 추측하지 않습니다. 해석되지 않은 변수, 외부 리소스, 지원하지 않는 필드는 조용히 채우거나 무시하지 않고 그렇다고 표시합니다.
+- 무엇을 지원하고 무엇을 지원하지 않는지 [support matrix](docs/support-matrix.md)에 적어 둡니다.
+
+## Mermaid 예시
+
+[예제 Compose 파일](examples/basic/compose.yaml)을 내보낸 결과입니다. GitHub에서 그대로 렌더링됩니다.
+
+```mermaid
+flowchart TB
+  svc_1["proxy"]
+  svc_2["web"]
+  svc_3["api"]
+  svc_4["migrate"]
+  svc_5["worker"]
+  svc_6["db"]
+  svc_7["cache"]
+  net_1(["frontend"]):::network
+  net_2(["backend"]):::network
+  vol_1[("db-data")]:::volume
+  vol_2[("uploads")]:::volume
+  svc_1 -.->|"starts after"| svc_2
+  svc_1 --- net_1
+  svc_2 -.->|"after healthy"| svc_3
+  svc_2 --- net_1
+  svc_2 --- net_2
+  svc_3 -.->|"after healthy"| svc_6
+  svc_3 -.->|"starts after"| svc_7
+  svc_3 -.->|"after successful completion"| svc_4
+  svc_3 --- net_2
+  svc_4 -.->|"after healthy"| svc_6
+  svc_4 --- net_2
+  svc_5 -.->|"starts after"| svc_7
+  svc_5 -.->|"starts after"| svc_6
+  svc_5 --- net_2
+  svc_5 --- vol_2
+  svc_6 --- net_2
+  svc_6 --- vol_1
+  svc_7 --- net_2
+  classDef network fill:#f5f3ff,stroke:#a78bfa
+  classDef volume fill:#fffbeb,stroke:#f59e0b
+```
+
+## 개인정보
+
+- **로컬 처리:** Compose 파일을 업로드하지 않습니다. 외부 CDN·폰트·분석 도구를 쓰지 않고, 배포본은 CSP로 외부 연결을 막습니다.
+- **값 가리기:** `environment`와 `build.args`의 값은 화면·진단·내보내기 어디에도 나오지 않습니다.
+- **한계:** `command`, `entrypoint`, `labels`, `healthcheck.test`는 표시하지 않습니다. 이미지 이름이나 URL처럼 표시되는 값 안의 비밀 정보는 탐지하지 않습니다. 자세한 내용은 [마스킹 경계](docs/support-matrix.md#masking-boundary)를 참고하세요.
 
 ## 범위 밖
 
@@ -63,7 +104,7 @@ npm run check   # 모든 워크스페이스의 타입 검사, 테스트, 빌드
 
 ## 기여
 
-이슈와 토론을 환영합니다. 기여 가이드는 v0.1.0 전에 추가할 예정입니다.
+이슈와 PR을 환영합니다. [CONTRIBUTING.md](CONTRIBUTING.md)를 먼저 읽어 주세요.
 
 ## 라이선스
 

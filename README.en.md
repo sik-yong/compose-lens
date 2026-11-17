@@ -4,35 +4,76 @@
 
 **See the structure of a Docker Compose file at a glance, right in your browser.**
 
-Compose Lens will let you paste or drop a `compose.yaml` and see its services, networks, and volumes as a graph. It will also flag configuration problems and export a Mermaid diagram for your README.
+Paste or drop a `compose.yaml` to see its services, networks, and volumes as a graph, get configuration problems flagged, and export a Mermaid diagram for your README. Everything runs in your browser.
 
-> **Status: pre-alpha, not usable yet.** v0.1.0 is being implemented. Everything below describes planned behavior. The design is in the [PRD](docs/PRD.md) (Korean) and the [support matrix](docs/support-matrix.md), and is still being reviewed.
+**[Open the web app →](https://sik-yong.github.io/compose-lens/)**
 
-## Why
+![Compose Lens: a Compose YAML editor on the left and a graph of services, networks, and volumes on the right](docs/images/screenshot.png)
 
-YAML gets hard to read once a stack has more than a handful of services. Compose Lens aims to be **accurate first**:
+> **Status: alpha.** v0.1.0 is being prepared. What's supported is in the [support matrix](docs/support-matrix.md); the design is in the [PRD](docs/PRD.md) (Korean).
 
-- It will only state what the file actually configures. `depends_on` is shown as start order, never as traffic. Sharing a network means "on the same network", not "talks to".
-- It won't guess. Unresolved `${VARIABLES}`, external resources, and unsupported fields will be labeled, not silently filled in or ignored.
-- What's supported and what isn't is written down in the [support matrix](docs/support-matrix.md).
+## Features
 
-## Planned for v0.1.0
-
-- Load a Compose file by upload or paste
+- Load a Compose file by upload, drag and drop, or paste
 - Interactive graph: services, networks, and named volumes, with auto layout, drag, and zoom
-- Detail panel for each service: image, build, ports, networks, volumes, and environment keys
+- Detail panel per service: image, build, ports, networks, volumes, dependencies, and environment keys (values hidden)
 - Diagnostics:
   - YAML syntax errors with line and column
   - Missing service, network, and volume references
-  - Potential host port conflicts
-  - Unsupported fields
-- Mermaid export
+  - Potential host port conflicts within the file (protocol, IP, and ranges aware)
+  - Unresolved `${VARIABLES}` and unsupported fields
+- Mermaid export: copy, copy for README, or save as `.mmd`
 
-## Privacy (design goals)
+## Accuracy first
 
-- **Local only:** Processing will happen entirely in your browser. Your Compose file is never uploaded, and the app will load no external CDNs, fonts, or analytics.
-- **Masked values:** Values of `environment` and `build.args` will be hidden in all generated output.
-- **Limits:** `command`, `entrypoint`, `labels`, and `healthcheck.test` are not displayed. Secrets inside displayed values, such as image references or URLs, are not guaranteed to be detected. See the [masking boundary](docs/support-matrix.md#masking-boundary).
+- It only states what the file configures. `depends_on` is shown as start order, never as traffic. Sharing a network means "on the same network in this configuration", not "talks to".
+- It doesn't guess. Unresolved variables, external resources, and unsupported fields are labeled, not silently filled in or ignored.
+- What's supported and what isn't is written down in the [support matrix](docs/support-matrix.md).
+
+## Mermaid example
+
+The [example Compose file](examples/basic/compose.yaml), exported. GitHub renders it as is.
+
+```mermaid
+flowchart TB
+  svc_1["proxy"]
+  svc_2["web"]
+  svc_3["api"]
+  svc_4["migrate"]
+  svc_5["worker"]
+  svc_6["db"]
+  svc_7["cache"]
+  net_1(["frontend"]):::network
+  net_2(["backend"]):::network
+  vol_1[("db-data")]:::volume
+  vol_2[("uploads")]:::volume
+  svc_1 -.->|"starts after"| svc_2
+  svc_1 --- net_1
+  svc_2 -.->|"after healthy"| svc_3
+  svc_2 --- net_1
+  svc_2 --- net_2
+  svc_3 -.->|"after healthy"| svc_6
+  svc_3 -.->|"starts after"| svc_7
+  svc_3 -.->|"after successful completion"| svc_4
+  svc_3 --- net_2
+  svc_4 -.->|"after healthy"| svc_6
+  svc_4 --- net_2
+  svc_5 -.->|"starts after"| svc_7
+  svc_5 -.->|"starts after"| svc_6
+  svc_5 --- net_2
+  svc_5 --- vol_2
+  svc_6 --- net_2
+  svc_6 --- vol_1
+  svc_7 --- net_2
+  classDef network fill:#f5f3ff,stroke:#a78bfa
+  classDef volume fill:#fffbeb,stroke:#f59e0b
+```
+
+## Privacy
+
+- **Local only:** Your Compose file is never uploaded. No external CDNs, fonts, or analytics; the deployed app blocks outside connections with a CSP.
+- **Masked values:** Values of `environment` and `build.args` never appear on screen, in diagnostics, or in exports.
+- **Limits:** `command`, `entrypoint`, `labels`, and `healthcheck.test` are not displayed. Secrets inside displayed values, such as image references or URLs, are not detected. See the [masking boundary](docs/support-matrix.md#masking-boundary).
 
 ## Out of scope
 
@@ -63,7 +104,7 @@ npm run check   # typecheck, test, and build all workspaces
 
 ## Contributing
 
-Issues and discussions are welcome. Contribution guidelines will be added before v0.1.0.
+Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
 ## License
 

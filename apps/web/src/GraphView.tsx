@@ -14,17 +14,21 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo } from "react";
 import type { ComposeGraph, ComposeModel, GraphNode } from "@compose-lens/core";
-import { layout, NODE_SIZE } from "./layout.js";
+import { layout, NODE_SIZE, type Direction } from "./layout.js";
 
-type FlowNodeData = { node: GraphNode; subtitle?: string; badge?: string };
 type FlowNode = Node<FlowNodeData>;
 
-const handles = (
-  <>
-    <Handle type="target" position={Position.Left} className="!bg-slate-400" />
-    <Handle type="source" position={Position.Right} className="!bg-slate-400" />
-  </>
-);
+type FlowNodeData = { node: GraphNode; subtitle?: string; badge?: string; direction: Direction };
+
+function Handles({ direction }: { direction: Direction }) {
+  const lr = direction === "LR";
+  return (
+    <>
+      <Handle type="target" position={lr ? Position.Left : Position.Top} className="!bg-slate-400" />
+      <Handle type="source" position={lr ? Position.Right : Position.Bottom} className="!bg-slate-400" />
+    </>
+  );
+}
 
 function ServiceNode({ data, selected }: NodeProps<FlowNode>) {
   return (
@@ -33,7 +37,7 @@ function ServiceNode({ data, selected }: NodeProps<FlowNode>) {
         selected ? "border-sky-500 ring-2 ring-sky-200" : "border-slate-300"
       }`}
     >
-      {handles}
+      <Handles direction={data.direction} />
       <div className="flex items-center gap-1.5">
         <span className="truncate text-sm font-semibold">{data.node.label}</span>
         {data.badge && (
@@ -54,7 +58,7 @@ function ResourceNode({ data, selected }: NodeProps<FlowNode>) {
         isNetwork ? "rounded-full border-violet-300 bg-violet-50" : "rounded border-amber-300 bg-amber-50"
       } ${selected ? "ring-2 ring-sky-200" : ""} ${data.node.external ? "border-dashed" : ""}`}
     >
-      {handles}
+      <Handles direction={data.direction} />
       <span className="text-slate-500">{isNetwork ? "network" : "volume"}</span>
       <span className="truncate font-medium">{data.node.label}</span>
       {tags && <span className="text-slate-400">({tags})</span>}
@@ -64,15 +68,22 @@ function ResourceNode({ data, selected }: NodeProps<FlowNode>) {
 
 const nodeTypes = { service: ServiceNode, network: ResourceNode, volume: ResourceNode };
 
-function toFlow(graph: ComposeGraph, model: ComposeModel): { nodes: FlowNode[]; edges: Edge[] } {
-  const positions = layout(graph);
+const LABEL = {
+  labelStyle: { fontSize: 11, fill: "#334155" },
+  labelBgStyle: { fill: "#ffffff", fillOpacity: 0.9 },
+  labelBgPadding: [4, 2] as [number, number],
+  labelBgBorderRadius: 3,
+};
+
+function toFlow(graph: ComposeGraph, model: ComposeModel, direction: Direction): { nodes: FlowNode[]; edges: Edge[] } {
+  const positions = layout(graph, direction);
   const services = new Map(model.services.map((s) => [s.name, s]));
   const nodes = graph.nodes.map((node): FlowNode => {
     const service = node.kind === "service" ? services.get(node.label) : undefined;
     const subtitle = service?.image ?? (service?.build ? "build" : undefined);
     const mode = service?.networkMode?.kind;
     const badge = mode === "host" ? "host network" : mode === "none" ? "no network" : undefined;
-    const data: FlowNodeData = { node };
+    const data: FlowNodeData = { node, direction };
     if (subtitle) data.subtitle = subtitle;
     if (badge) data.badge = badge;
     return {
@@ -92,7 +103,7 @@ function toFlow(graph: ComposeGraph, model: ComposeModel): { nodes: FlowNode[]; 
         label: e.optional ? `${e.label} (optional)` : e.label,
         markerEnd: { type: MarkerType.ArrowClosed, color: "#0f172a" },
         style: { stroke: "#0f172a", strokeDasharray: "6 4", opacity: e.optional ? 0.5 : 1 },
-        labelStyle: { fontSize: 11 },
+        ...LABEL,
       };
     }
     if (e.kind === "network_mode") {
@@ -103,7 +114,7 @@ function toFlow(graph: ComposeGraph, model: ComposeModel): { nodes: FlowNode[]; 
         label: e.label,
         markerEnd: { type: MarkerType.ArrowClosed, color: "#7c3aed" },
         style: { stroke: "#7c3aed", strokeWidth: 2 },
-        labelStyle: { fontSize: 11 },
+        ...LABEL,
       };
     }
     return {
@@ -119,11 +130,12 @@ function toFlow(graph: ComposeGraph, model: ComposeModel): { nodes: FlowNode[]; 
 interface Props {
   graph: ComposeGraph;
   model: ComposeModel;
+  direction: Direction;
   onSelect: (node: GraphNode | undefined) => void;
 }
 
-export function GraphView({ graph, model, onSelect }: Props) {
-  const flow = useMemo(() => toFlow(graph, model), [graph, model]);
+export function GraphView({ graph, model, direction, onSelect }: Props) {
+  const flow = useMemo(() => toFlow(graph, model, direction), [graph, model, direction]);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(flow.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flow.edges);
 
@@ -143,6 +155,7 @@ export function GraphView({ graph, model, onSelect }: Props) {
       onPaneClick={() => onSelect(undefined)}
       nodesConnectable={false}
       fitView
+      fitViewOptions={{ padding: 0.1, maxZoom: 1.2 }}
       forceColorMode="light"
       minZoom={0.1}
     >
