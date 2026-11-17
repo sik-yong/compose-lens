@@ -209,7 +209,8 @@ function parseShortMount(raw: string): Omit<Mount, "index"> | undefined {
   const [source = "", target = "", mode = ""] = parts;
   if (parts.length > 3 || parts.some((part) => part === "")) return undefined;
   const kind = classifySource(source);
-  return { kind, source: kind === "bind" ? redactUrlCredentials(source) : source, target, readOnly: mode.split(",").includes("ro") };
+  // Redact every kind: a variable can make a URL source `unresolved` (a real named volume has no `://`).
+  return { kind, source: redactUrlCredentials(source), target, readOnly: mode.split(",").includes("ro") };
 }
 
 function parseLongMount(entry: Obj): Omit<Mount, "index"> | undefined {
@@ -224,7 +225,7 @@ function parseLongMount(entry: Obj): Omit<Mount, "index"> | undefined {
   else if (type === undefined) return undefined;
   else kind = "other";
   const mount: Omit<Mount, "index"> = { kind, readOnly };
-  if (source) mount.source = kind === "bind" || kind === "other" ? redactUrlCredentials(source) : source;
+  if (source) mount.source = redactUrlCredentials(source);
   if (target) mount.target = target;
   if (kind === "other") mount.type = type;
   return mount;
@@ -386,7 +387,8 @@ function normalizeBuild(ctx: Context, value: unknown, path: DocumentPath, seen: 
   return build;
 }
 
-function parseNetworkMode(raw: string): NetworkMode {
+function parseNetworkMode(text: string): NetworkMode {
+  const raw = redactUrlCredentials(text);
   if (hasVariable(raw)) return { kind: "unresolved", raw };
   if (raw === "none" || raw === "host") return { kind: raw };
   if (raw.startsWith("service:")) return { kind: "service", service: raw.slice("service:".length) };

@@ -32,6 +32,27 @@ describe("URL credentials", () => {
   });
 });
 
+describe("URL credentials in unresolved and other values", () => {
+  it("redacts mount sources of every kind and network_mode", () => {
+    const yaml = [
+      "services:",
+      "  a:",
+      "    image: x",
+      "    volumes:",
+      '      - "./${SUBDIR:-https://u:S3CRET@example.com}:/app"',
+      "      - {type: volume, source: 'https://u:S3CRET@example.com/${X}', target: /v}",
+      "      - {type: npipe, source: 'https://u:S3CRET@example.com', target: /p}",
+      "  b:",
+      "    image: x",
+      "    network_mode: 'container:https://u:S3CRET@example.com/${X}'",
+      "",
+    ].join("\n");
+    const result = analyze(yaml);
+    expect(JSON.stringify(result)).not.toContain("S3CRET");
+    expect(result.model!.services[0]!.volumes.map((m) => m.kind)).toEqual(["unresolved", "unresolved", "other"]);
+  });
+});
+
 describe("port pools", () => {
   it("notes a pool that overlaps a fixed host port, without a warning", () => {
     const result = analyze("services:\n  a: {image: x, ports: ['9000-9010:80']}\n  b: {image: x, ports: ['9005:9005']}\n");

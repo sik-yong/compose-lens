@@ -311,7 +311,8 @@ export function GraphView({ graph, model, direction, edgeStyle, showPorts, mode,
 
   const onChange = useCallback(
     (changes: NodeChangeset<FlowNode>) => {
-      const dragged = changes.toArray().flatMap((c) => (c.type === "position" && c.dragging ? [c.id] : []));
+      // Any user move (drag or arrow keys) makes the node's routes stale.
+      const dragged = changes.toArray().flatMap((c) => (c.type === "position" && c.position ? [c.id] : []));
       if (dragged.length > 0) setMoved((prev) => (dragged.every((id) => prev.has(id)) ? prev : new Set([...prev, ...dragged])));
       onNodesChange(changes);
     },
@@ -337,6 +338,7 @@ export function GraphView({ graph, model, direction, edgeStyle, showPorts, mode,
       onNodeClick={(_, n) => onSelect(n.data.node)}
       onPaneClick={() => onSelect(undefined)}
       nodesConnectable={false}
+      deleteKeyCode={null}
       fitView
       fitViewOptions={FIT}
       forceColorMode={mode}
