@@ -51,7 +51,7 @@ export function toMermaid(graph: ComposeGraph, options: { direction?: "TB" | "LR
         break;
     }
   }
-  lines.push("  classDef network fill:#f5f3ff,stroke:#a78bfa");
-  lines.push("  classDef volume fill:#fffbeb,stroke:#f59e0b");
+  lines.push("  classDef network fill:#f5f3ff,stroke:#a78bfa,color:#2e1065");
+  lines.push("  classDef volume fill:#fffbeb,stroke:#f59e0b,color:#451a03");
   return `${lines.join("\n")}\n`;
 }

@@ -58,3 +58,13 @@ describe("toMermaid", () => {
     expect(escapeLabel("\u202Eevil")).toBe('"#8238;evil"'); // bidi override is escaped
   });
 });
+
+describe("README Mermaid examples", () => {
+  it("match the generator output for the sample stack", () => {
+    const sample = readFileSync(new URL("../../../examples/basic/compose.yaml", import.meta.url), "utf8");
+    const block = `\`\`\`mermaid\n${toMermaid(analyze(sample).graph!)}\`\`\``;
+    for (const readme of ["README.md", "README.en.md"]) {
+      expect(readFileSync(new URL(`../../../${readme}`, import.meta.url), "utf8"), readme).toContain(block);
+    }
+  });
+});

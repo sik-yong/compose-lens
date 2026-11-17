@@ -65,8 +65,8 @@ flowchart TB
   svc_6 --- net_2
   svc_6 --- vol_1
   svc_7 --- net_2
-  classDef network fill:#f5f3ff,stroke:#a78bfa
-  classDef volume fill:#fffbeb,stroke:#f59e0b
+  classDef network fill:#f5f3ff,stroke:#a78bfa,color:#2e1065
+  classDef volume fill:#fffbeb,stroke:#f59e0b,color:#451a03
 ```
 
 ## 개인정보
