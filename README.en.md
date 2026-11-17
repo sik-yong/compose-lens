@@ -10,7 +10,7 @@ Paste or drop a `compose.yaml` to see its services, networks, and volumes as a g
 
 ![Compose Lens: a Compose YAML editor on the left and a graph of services, networks, and volumes on the right](docs/images/screenshot.png)
 
-> **Status: alpha.** v0.1.0 is being prepared. What's supported is in the [support matrix](docs/support-matrix.md); the design is in the [PRD](docs/PRD.md) (Korean).
+> **Status: alpha (v0.1.0).** What's supported is in the [support matrix](docs/support-matrix.md); the design is in the [PRD](docs/PRD.md) (Korean).
 
 ## Features
 

@@ -204,7 +204,7 @@ React + TypeScript + Vite, @xyflow/react, yaml, dagre, Tailwind CSS, Vitest, Git
 | M0 | 모노레포 기반: workspaces, TS 설정, CI | 완료 |
 | M1 | **얇은 수직 슬라이스:** YAML 파싱·자원 상한·문법 오류 → 서비스·`depends_on`·네트워크(암묵적 `default`)·named volume·기본 포트 정규화 → React Flow 그래프·자동 레이아웃·상세 패널 | 완료 |
 | M2 | 정확성: 참조 오류, fixed 포트 충돌, 볼륨 종류 구분, 변수 감지·판정 보류, `network_mode`, 마스킹, 미지원 필드 안내, fixture 테스트 | 완료 |
-| M3 | Mermaid 내보내기, 예제, README 스크린샷, 수동 검증 기록 → v0.1.0 공개 | |
+| M3 | Mermaid 내보내기, 예제, README 스크린샷, 수동 검증 기록 → v0.1.0 공개 | 완료 |
 
 ### v0.1.1 이후로 연기
 
