@@ -22,7 +22,7 @@ Paste or drop a `compose.yaml` to see its services, networks, and volumes as a g
   - Missing service, network, and volume references
   - Potential host port conflicts within the file (protocol, IP, and ranges aware)
   - Unresolved `${VARIABLES}` and unsupported fields
-- Mermaid export: copy, copy for README, or save as `.mmd`
+- Mermaid export: copy, copy for README, or save as `.mmd`. Diagrams over Mermaid's default render limits (500 edges, 50,000 characters) may not render on GitHub; the app warns you and never truncates the export.
 
 ## Accuracy first
 
@@ -72,7 +72,7 @@ flowchart TB
 ## Privacy
 
 - **Local only:** Your Compose file is never uploaded. No external CDNs, fonts, or analytics; the deployed app blocks outside connections with a CSP.
-- **Masked values:** Values of `environment` and `build.args` never appear on screen, in diagnostics, or in exports.
+- **Masked values:** Values of `environment` and `build.args` never appear in the detail panel, diagnostics, or exports. The input editor still shows the text you pasted.
 - **Limits:** `command`, `entrypoint`, `labels`, and `healthcheck.test` are not displayed. Secrets inside displayed values, such as image references or URLs, are not detected. See the [masking boundary](docs/support-matrix.md#masking-boundary).
 
 ## Out of scope

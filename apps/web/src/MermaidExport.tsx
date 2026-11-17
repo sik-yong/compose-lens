@@ -1,4 +1,4 @@
-import { toMermaid, type ComposeGraph } from "@compose-lens/core";
+import { mermaidSizeWarnings, toMermaid, type ComposeGraph } from "@compose-lens/core";
 import { useMemo, useState } from "react";
 
 const fenced = (code: string) => `\`\`\`mermaid\n${code}\`\`\`\n`;
@@ -20,6 +20,7 @@ interface Props {
 
 export function MermaidExport({ graph, direction, onClose }: Props) {
   const code = useMemo(() => toMermaid(graph, { direction }), [graph, direction]);
+  const warnings = useMemo(() => mermaidSizeWarnings(graph, code), [graph, code]);
   const [copied, setCopied] = useState<string>();
 
   async function copy(text: string, what: string) {
@@ -55,8 +56,13 @@ export function MermaidExport({ graph, direction, onClose }: Props) {
           ? "Copy failed. Select the text below and copy it manually."
           : copied
             ? `Copied ${copied === "markdown" ? "as a ```mermaid block" : "the code"}.`
-            : "Paste into a ```mermaid block in GitHub Markdown. Environment values are never included."}
+            : "Paste into a ```mermaid block in GitHub Markdown. Environment and build arg values are never included."}
       </p>
+      {warnings.map((w) => (
+        <p key={w} role="status" className="mb-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+          {w} The export is complete; nothing is left out.
+        </p>
+      ))}
       <textarea
         readOnly
         aria-label="Mermaid code"

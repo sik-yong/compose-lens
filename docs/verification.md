@@ -10,7 +10,7 @@ Checks from PRD §12 that CI can't run. Re-run them before each release and add 
 |---|---|
 | Load the sample, edit text, open a file / paste | Pass. Graph, problems list, and detail panel update |
 | Click a service, network, and volume node | Pass. Detail panel shows the documented fields |
-| Paste `test/fixtures/masking-valid` (values marked `S3CRET`) | Pass. No `S3CRET` text anywhere in the page DOM |
+| Paste `test/fixtures/masking-valid` (values marked `S3CRET`) | Pass. No `S3CRET` outside the input editor (graph, detail panel, problems list, Mermaid export). The editor shows the pasted text, as intended |
 | Export Mermaid (panel, copy, `.mmd` download) | Pass. Panel shows `flowchart TB` output |
 | Production CSP meta present | Pass |
 | Network requests after load, while editing and exporting | Pass. Only the app's own HTML, JS, and CSS on load; none afterwards |

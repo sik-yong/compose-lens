@@ -4,8 +4,9 @@ import type { ComposeGraph, GraphNode } from "./graph.js";
  * Characters allowed as-is inside a quoted Mermaid label. Everything else is
  * written as a Mermaid entity code (#NNN;), so input can never close the
  * label, start a directive (%%), add a click/link, or inject HTML (PRD §8.2).
+ * `:` is escaped too: Mermaid's style preprocessing rewrites `…:…#…;` text.
  */
-const SAFE = /[\p{L}\p{N} _.,:/@+=-]/u;
+const SAFE = /[\p{L}\p{N} _.,/@+=-]/u;
 
 export function escapeLabel(text: string): string {
   let out = "";
@@ -13,6 +14,28 @@ export function escapeLabel(text: string): string {
     out += SAFE.test(char) ? char : `#${char.codePointAt(0)};`;
   }
   return `"${out}"`;
+}
+
+/** Mermaid's default render limits (config `maxEdges`, `maxTextSize`). */
+export const MERMAID_LIMITS = { maxEdges: 500, maxTextSize: 50_000 } as const;
+
+/**
+ * Reasons a renderer with default settings (GitHub included) may refuse this
+ * diagram. The export itself is never truncated.
+ */
+export function mermaidSizeWarnings(graph: ComposeGraph, code: string): string[] {
+  const warnings: string[] = [];
+  if (graph.edges.length > MERMAID_LIMITS.maxEdges) {
+    warnings.push(
+      `This diagram has ${graph.edges.length} edges. Mermaid renders at most ${MERMAID_LIMITS.maxEdges} by default, so GitHub and other renderers may refuse it.`,
+    );
+  }
+  if (code.length > MERMAID_LIMITS.maxTextSize) {
+    warnings.push(
+      `This diagram is ${code.length.toLocaleString("en-US")} characters. Mermaid renders at most ${MERMAID_LIMITS.maxTextSize.toLocaleString("en-US")} by default, so GitHub and other renderers may refuse it.`,
+    );
+  }
+  return warnings;
 }
 
 function nodeLine(n: GraphNode): string {

@@ -9,7 +9,7 @@ Every change should keep these true. They are what makes the tool trustworthy.
 1. **Accurate, not guessed.** Only state what the Compose file configures. If something can't be determined (a variable, an external resource, an unsupported field), say so with a diagnostic instead of guessing or ignoring it.
 2. **The support matrix is the contract.** [docs/support-matrix.md](docs/support-matrix.md) must match the behavior. Update it in the same pull request as the code.
 3. **Local only.** The web app makes no network requests at runtime and loads no third-party resources.
-4. **Secrets stay hidden.** Values of `environment` and `build.args` never appear in any output, including diagnostics. Diagnostic messages never quote input values.
+4. **Secrets stay hidden.** Values of `environment` and `build.args` never appear in generated output (graph, detail panel, diagnostics, exports). Diagnostics may name services, networks, volumes, and other structural values, but never masked values, and YAML syntax errors use fixed messages instead of the parser's text.
 5. **Input is data.** Names from the file are rendered as text only and never become ids, HTML, or Mermaid syntax.
 
 ## Setup

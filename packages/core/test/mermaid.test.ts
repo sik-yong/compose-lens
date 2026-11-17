@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { analyze, escapeLabel, toMermaid } from "../src/index.js";
+import { MERMAID_LIMITS, analyze, escapeLabel, mermaidSizeWarnings, toMermaid } from "../src/index.js";
 
 const mermaidOf = (yaml: string) => toMermaid(analyze(yaml).graph!);
 
@@ -66,5 +66,29 @@ describe("README Mermaid examples", () => {
     for (const readme of ["README.md", "README.en.md"]) {
       expect(readFileSync(new URL(`../../../${readme}`, import.meta.url), "utf8"), readme).toContain(block);
     }
+  });
+
+  it("escapes `:` so Mermaid's style preprocessing can't rewrite labels", () => {
+    expect(escapeLabel("style:foo#bar;")).toBe('"style#58;foo#35;bar#59;"');
+  });
+
+  it("warns, without truncating, when the diagram exceeds Mermaid's default limits", () => {
+    const sample = readFileSync(new URL("../../../examples/basic/compose.yaml", import.meta.url), "utf8");
+    const small = analyze(sample).graph!;
+    expect(mermaidSizeWarnings(small, toMermaid(small))).toEqual([]);
+
+    // 60 services, each depending on all earlier ones: 1770 depends_on edges (acyclic).
+    const lines = ["services:"];
+    for (let i = 0; i < 60; i++) {
+      lines.push(`  s${i}:`, "    image: x");
+      if (i > 0) lines.push(`    depends_on: [${Array.from({ length: i }, (_, j) => `s${j}`).join(", ")}]`);
+    }
+    const big = analyze(lines.join("\n") + "\n").graph!;
+    const code = toMermaid(big);
+    expect(big.edges.length).toBeGreaterThan(MERMAID_LIMITS.maxEdges);
+    expect(code.split("\n").filter((l) => l.includes("-.->")).length).toBe(big.edges.filter((e) => e.kind === "depends_on").length);
+    const warnings = mermaidSizeWarnings(big, code);
+    expect(warnings.some((w) => w.includes("edges"))).toBe(true);
+    expect(warnings.some((w) => w.includes("characters"))).toBe(code.length > MERMAID_LIMITS.maxTextSize);
   });
 });
