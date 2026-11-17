@@ -258,7 +258,8 @@ function toFlow(graph: ComposeGraph, model: ComposeModel, o: FlowOptions): { nod
   return { nodes, edges };
 }
 
-const FIT = { padding: 0.12, maxZoom: 1.2 };
+// Padding is in pixels (a bare number), leaving room for edge labels outside node bounds.
+const FIT = { padding: "40px", maxZoom: 1.2 } as const;
 
 /**
  * Fits the graph after each layout and whenever the pane is resized. The

@@ -10,7 +10,7 @@
 
 ![Compose Lens 화면: 왼쪽은 Compose YAML 편집기, 오른쪽은 서비스·네트워크·볼륨 그래프](docs/images/screenshot.png)
 
-> **상태: alpha (v0.1.0).** 지원 범위는 [support matrix](docs/support-matrix.md)(영문)에, 설계는 [PRD](docs/PRD.md)에 있습니다.
+> **상태: alpha (v0.1.1).** 지원 범위는 [support matrix](docs/support-matrix.md)(영문)에, 설계는 [PRD](docs/PRD.md)에 있습니다.
 
 ## 기능
 
